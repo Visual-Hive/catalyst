@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0.0",
+  "level": 1,
+  "metadata": {
+    "projectName": "Test Project",
+    "framework": "react",
+    "createdAt": "2025-11-19T12:00:00Z"
+  },
+  "components": {
+    "comp_button_001": {
+      "id": "comp_button_001",
+      "displayName": "Button",
+      "type": "PrimitiveComponent",
+      "properties": {
+        "label": {
+          "type": "expression",
+          "expression": "{{ state.buttonText }}",
+          "dependencies": ["state.buttonText"]
+        }
+      },
+      "children": []
+    }
+  }
+}

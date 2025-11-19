@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "1.0.0",
+  "level": 1,
+  "metadata": {
+    "projectName": "Test Project",
+    "framework": "react",
+    "createdAt": "2025-11-19T12:00:00Z"
+  },
+  "components": {
+    "comp_app_001": {
+      "id": "comp_app_001",
+      "displayName": "App",
+      "type": "CompositeComponent",
+      "properties": {},
+      "children": ["comp_header_001", "comp_main_001"]
+    },
+    "comp_header_001": {
+      "id": "comp_header_001",
+      "displayName": "Header",
+      "type": "CompositeComponent",
+      "properties": {},
+      "children": ["comp_logo_001", "comp_nav_001"]
+    },
+    "comp_logo_001": {
+      "id": "comp_logo_001",
+      "displayName": "Logo",
+      "type": "PrimitiveComponent",
+      "properties": {
+        "src": {
+          "type": "static",
+          "value": "/logo.png",
+          "dataType": "string"
+        }
+      },
+      "children": []
+    },
+    "comp_nav_001": {
+      "id": "comp_nav_001",
+      "displayName": "Nav",
+      "type": "CompositeComponent",
+      "properties": {},
+      "children": ["comp_link_001", "comp_link_002"]
+    },
+    "comp_link_001": {
+      "id": "comp_link_001",
+      "displayName": "Link",
+      "type": "PrimitiveComponent",
+      "properties": {
+        "text": {
+          "type": "static",
+          "value": "Home",
+          "dataType": "string"
+        }
+      },
+      "children": []
+    },
+    "comp_link_002": {
+      "id": "comp_link_002",
+      "displayName": "Link",
+      "type": "PrimitiveComponent",
+      "properties": {
+        "text": {
+          "type": "static",
+          "value": "About",
+          "dataType": "string"
+        }
+      },
+      "children": []
+    },
+    "comp_main_001": {
+      "id": "comp_main_001",
+      "displayName": "Main",
+      "type": "CompositeComponent",
+      "properties": {},
+      "children": []
+    }
+  }
+}

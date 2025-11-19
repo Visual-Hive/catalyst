@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "level": 1,
+  "metadata": {
+    "projectName": "Test Project",
+    "framework": "react",
+    "createdAt": "2025-11-19T12:00:00Z"
+  },
+  "components": {
+    "comp_a_001": {
+      "id": "comp_a_001",
+      "displayName": "ComponentA",
+      "type": "CompositeComponent",
+      "properties": {},
+      "children": ["comp_b_001"]
+    },
+    "comp_b_001": {
+      "id": "comp_b_001",
+      "displayName": "ComponentB",
+      "type": "CompositeComponent",
+      "properties": {},
+      "children": ["comp_c_001"]
+    },
+    "comp_c_001": {
+      "id": "comp_c_001",
+      "displayName": "ComponentC",
+      "type": "CompositeComponent",
+      "properties": {},
+      "children": ["comp_a_001"]
+    }
+  }
+}
