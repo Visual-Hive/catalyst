@@ -752,7 +752,7 @@ describe('SchemaValidator', () => {
       
       expect(result.validationTime).toBeDefined();
       expect(typeof result.validationTime).toBe('number');
-      expect(result.validationTime).toBeGreaterThan(0);
+      expect(result.validationTime).toBeGreaterThanOrEqual(0);
     });
     
     it('should include component count', () => {

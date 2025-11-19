@@ -13,6 +13,7 @@
  * Coverage Target: >90%
  */
 
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileChangeTracker } from '../../src/core/FileChangeTracker';
 import * as crypto from 'crypto';
 
@@ -668,7 +669,7 @@ describe('FileChangeTracker', () => {
 
   describe('Debug Mode', () => {
     it('should log debug information when enabled', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const debugTracker = new FileChangeTracker({ debug: true });
 
       await debugTracker.onBeforeGenerate('/project/test.tsx', 'content');
@@ -680,7 +681,7 @@ describe('FileChangeTracker', () => {
     });
 
     it('should not log when debug disabled', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await tracker.onBeforeGenerate('/project/test.tsx', 'content');
 
@@ -691,7 +692,7 @@ describe('FileChangeTracker', () => {
     });
 
     it('should log debug info for isUserEdit when paused', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const debugTracker = new FileChangeTracker({ debug: true });
 
       await debugTracker.onBeforeGenerate('/project/test.tsx', 'content');
@@ -707,7 +708,7 @@ describe('FileChangeTracker', () => {
     });
 
     it('should log debug info for isUserEdit when no expected hash', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const debugTracker = new FileChangeTracker({ debug: true });
 
       debugTracker.isUserEdit('/project/new.tsx', 'content');
@@ -722,7 +723,7 @@ describe('FileChangeTracker', () => {
     });
 
     it('should log debug info for isUserEdit hash comparison', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const debugTracker = new FileChangeTracker({ debug: true });
 
       await debugTracker.onBeforeGenerate('/project/test.tsx', 'original');
@@ -740,7 +741,7 @@ describe('FileChangeTracker', () => {
     });
 
     it('should log when state is cleared', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const debugTracker = new FileChangeTracker({ debug: true });
 
       debugTracker.clear();
@@ -756,7 +757,7 @@ describe('FileChangeTracker', () => {
 
   describe('Error Handling', () => {
     it('should handle errors in onAfterGenerate gracefully', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
       await tracker.onBeforeGenerate('/project/test.tsx', 'content');
       
@@ -770,7 +771,7 @@ describe('FileChangeTracker', () => {
     });
 
     it('should log errors in isUserEdit and return true (fail-safe)', () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       
       // isUserEdit should handle any internal errors gracefully
       const result = tracker.isUserEdit('/project/test.tsx', 'content');
