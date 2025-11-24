@@ -361,6 +361,7 @@ Be aware of these MVP constraints:
 - Step debugger
 - Real-time data connections
 - AI code review
+- Hosted backend system (Parse Server)
 - Database integration
 
 **See**: [MVP_ROADMAP.md](./docs/MVP_ROADMAP.md) for detailed timeline

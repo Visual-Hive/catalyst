@@ -21,15 +21,16 @@ Welcome to the Visual Low-Code Builder documentation! This guide will help you n
 ### Extensibility
 9. **[PLUGIN_SYSTEM.md](./docs/PLUGIN_SYSTEM.md)** - Framework adapter interface
 10. **[BIDIRECTIONAL_SYNC.md](./docs/BIDIRECTIONAL_SYNC.md)** - Code-to-manifest reverse engineering (stretch goal)
+11. **[HOSTED_BACKEND.md](./docs/HOSTED_BACKEND.md)** - Optional Parse Server backend with scheduling (Future)
 
 ### Development & Best Practices
-11. **[PERFORMANCE.md](./docs/PERFORMANCE.md)** - Performance optimization strategy and benchmarks
-12. **[SECURITY.md](./docs/SECURITY.md)** - Two-tier security model and expression sandboxing
-13. **[TESTING_STRATEGY.md](./docs/TESTING_STRATEGY.md)** - Comprehensive testing approach and quality assurance
+12. **[PERFORMANCE.md](./docs/PERFORMANCE.md)** - Performance optimization strategy and benchmarks
+13. **[SECURITY.md](./docs/SECURITY.md)** - Two-tier security model and expression sandboxing
+14. **[TESTING_STRATEGY.md](./docs/TESTING_STRATEGY.md)** - Comprehensive testing approach and quality assurance
 
 ### Planning & Learning
-14. **[MVP_ROADMAP.md](./docs/MVP_ROADMAP.md)** - Development phases, timeline, and resource allocation
-15. **[EXAMPLES.md](./docs/EXAMPLES.md)** - Real-world component examples and code patterns
+15. **[MVP_ROADMAP.md](./docs/MVP_ROADMAP.md)** - Development phases, timeline, and resource allocation
+16. **[EXAMPLES.md](./docs/EXAMPLES.md)** - Real-world component examples and code patterns
 
 ---
 
