@@ -4,21 +4,23 @@
  * 
  * @architecture Phase 1, Task 1.2 - Three-Panel Layout
  * @created 2025-11-19
+ * @updated 2025-11-25 - Added PreviewPanel integration (Task 1.4B)
  * @author AI (Cline) + Human Review
- * @confidence 9/10 - Tab system with professional placeholders
+ * @confidence 9/10 - Tab system with preview integration
  * 
  * PROBLEM SOLVED:
  * - Provides multi-view interface for preview, code, and console
  * - Tab system allows switching between different editor modes
- * - Professional empty states for each tab
+ * - Preview panel with live Vite dev server
  * 
  * SOLUTION:
  * - Headless UI Tab component for accessibility
  * - Keyboard shortcuts for tab switching
  * - State persistence via useLayout hook
+ * - PreviewPanel for live preview rendering
  * 
  * TABS:
- * - Preview: Live component preview (Task 1.4+)
+ * - Preview: Live component preview via Vite dev server
  * - Code: Generated code viewer (Task 3.1+)
  * - Console: Debug output (Phase 3+)
  * 
@@ -36,32 +38,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useLayout } from '../hooks/useLayout';
 import { useHotkeys } from 'react-hotkeys-hook';
-
-/**
- * Preview tab content (placeholder)
- * 
- * Will display live component preview in Task 1.4+
- */
-function PreviewTabContent() {
-  return (
-    <div className="flex items-center justify-center h-full bg-gray-50">
-      <div className="text-center max-w-md px-6">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-100 mb-6">
-          <EyeIcon className="w-10 h-10 text-blue-600" />
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Preview
-        </h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Live preview of your components will appear here. Build and preview your UI in real-time.
-        </p>
-        <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 italic">
-          🚧 Preview renderer coming in Task 1.4 - Project Management
-        </div>
-      </div>
-    </div>
-  );
-}
+import { PreviewPanel } from './Preview';
 
 /**
  * Code tab content (placeholder)
@@ -233,15 +210,15 @@ export function EditorPanel() {
           </Tab>
         </Tab.List>
 
-        {/* Tab Panels */}
-        <Tab.Panels className="flex-1 overflow-hidden">
-          <Tab.Panel className="h-full">
-            <PreviewTabContent />
+        {/* Tab Panels - flex-1 with min-h-0 to allow proper shrinking in flex container */}
+        <Tab.Panels className="flex-1 min-h-0 flex flex-col">
+          <Tab.Panel className="flex-1 min-h-0 flex flex-col">
+            <PreviewPanel />
           </Tab.Panel>
-          <Tab.Panel className="h-full">
+          <Tab.Panel className="flex-1 min-h-0 flex flex-col">
             <CodeTabContent />
           </Tab.Panel>
-          <Tab.Panel className="h-full">
+          <Tab.Panel className="flex-1 min-h-0 flex flex-col">
             <ConsoleTabContent />
           </Tab.Panel>
         </Tab.Panels>
