@@ -11,6 +11,7 @@
  * 
  * @architecture Phase 1, Task 1.1 - Electron Application Shell
  * @created 2025-11-19
+ * @updated 2025-11-25 - Added preview system API (Task 1.4A)
  * @author AI (Cline) + Human Review
  * @confidence 9/10 - Following Electron security best practices
  * 
@@ -22,6 +23,50 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+
+/**
+ * Preview server state type (from main process)
+ */
+interface PreviewServerState {
+  status: 'stopped' | 'starting' | 'running' | 'stopping' | 'error';
+  port: number | null;
+  url: string | null;
+  error: string | null;
+  projectPath: string | null;
+  pid: number | null;
+  startedAt: Date | null;
+}
+
+/**
+ * Preview API interface
+ * 
+ * Controls the Vite dev server for project preview.
+ */
+export interface PreviewAPI {
+  /** Start Vite dev server for a project */
+  start: (projectPath: string) => Promise<{ success: boolean; data?: { port: number; url: string }; error?: string }>;
+  
+  /** Stop the current Vite dev server */
+  stop: () => Promise<{ success: boolean; error?: string }>;
+  
+  /** Restart the Vite dev server */
+  restart: () => Promise<{ success: boolean; data?: { port: number; url: string }; error?: string }>;
+  
+  /** Get current server status */
+  status: () => Promise<{ success: boolean; data?: PreviewServerState; error?: string }>;
+  
+  /** Listen for server ready events */
+  onReady: (callback: (data: { port: number; url: string }) => void) => () => void;
+  
+  /** Listen for server error events */
+  onError: (callback: (data: { message: string; code?: string }) => void) => () => void;
+  
+  /** Listen for server output (stdout/stderr) */
+  onOutput: (callback: (data: { line: string; type: 'stdout' | 'stderr' }) => void) => () => void;
+  
+  /** Listen for state changes */
+  onStateChange: (callback: (state: PreviewServerState) => void) => () => void;
+}
 
 /**
  * Exposed API interface for renderer process
@@ -60,6 +105,9 @@ export interface ElectronAPI {
   
   // Shell operations (Task 1.3C)
   showItemInFolder: (fullPath: string) => Promise<{ success: boolean; error?: string }>;
+  
+  // Preview system (Task 1.4A)
+  preview: PreviewAPI;
   
   // File operations (to be implemented in future tasks)
   // readFile: (filepath: string) => Promise<string>;
@@ -135,6 +183,58 @@ const electronAPI: ElectronAPI = {
   
   // Shell operations (Task 1.3C)
   showItemInFolder: (fullPath: string) => ipcRenderer.invoke('shell:show-item-in-folder', fullPath),
+  
+  // Preview system (Task 1.4A)
+  preview: {
+    // Start Vite dev server
+    start: (projectPath: string) => ipcRenderer.invoke('preview:start', projectPath),
+    
+    // Stop Vite dev server
+    stop: () => ipcRenderer.invoke('preview:stop'),
+    
+    // Restart Vite dev server
+    restart: () => ipcRenderer.invoke('preview:restart'),
+    
+    // Get current server status
+    status: () => ipcRenderer.invoke('preview:status'),
+    
+    // Listen for server ready events
+    onReady: (callback: (data: { port: number; url: string }) => void) => {
+      const listener = (_event: any, data: { port: number; url: string }) => callback(data);
+      ipcRenderer.on('preview:ready', listener);
+      // Return cleanup function
+      return () => {
+        ipcRenderer.removeListener('preview:ready', listener);
+      };
+    },
+    
+    // Listen for server error events
+    onError: (callback: (data: { message: string; code?: string }) => void) => {
+      const listener = (_event: any, data: { message: string; code?: string }) => callback(data);
+      ipcRenderer.on('preview:error', listener);
+      return () => {
+        ipcRenderer.removeListener('preview:error', listener);
+      };
+    },
+    
+    // Listen for server output
+    onOutput: (callback: (data: { line: string; type: 'stdout' | 'stderr' }) => void) => {
+      const listener = (_event: any, data: { line: string; type: 'stdout' | 'stderr' }) => callback(data);
+      ipcRenderer.on('preview:output', listener);
+      return () => {
+        ipcRenderer.removeListener('preview:output', listener);
+      };
+    },
+    
+    // Listen for state changes
+    onStateChange: (callback: (state: PreviewServerState) => void) => {
+      const listener = (_event: any, state: PreviewServerState) => callback(state);
+      ipcRenderer.on('preview:state-change', listener);
+      return () => {
+        ipcRenderer.removeListener('preview:state-change', listener);
+      };
+    },
+  },
   
   // File operations will be added in future tasks
   // readFile: (filepath: string) => ipcRenderer.invoke('read-file', filepath),

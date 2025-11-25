@@ -21,7 +21,7 @@
 import { app, BrowserWindow, Menu, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { setupIpcHandlers } from './ipc-handlers';
+import { setupIpcHandlers, cleanupPreviewServer, cleanupIpcHandlers } from './ipc-handlers';
 
 // ESM compatibility
 const __filename = fileURLToPath(import.meta.url);
@@ -283,6 +283,35 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+/**
+ * Application lifecycle: Before quit
+ * Clean up resources including preview server to prevent orphan processes
+ * 
+ * CRITICAL: This ensures no Vite dev server processes are left running
+ * when the app closes. Without this, orphan Node.js processes would remain.
+ */
+app.on('before-quit', async (event) => {
+  console.log('[INFO] Application quitting, cleaning up resources...');
+  
+  // Prevent quit until cleanup is done
+  event.preventDefault();
+  
+  try {
+    // Clean up preview server (kills any running Vite process)
+    await cleanupPreviewServer();
+    
+    // Clean up IPC handlers
+    cleanupIpcHandlers();
+    
+    console.log('[INFO] Cleanup complete, quitting...');
+  } catch (error) {
+    console.error('[ERROR] Cleanup failed:', error);
+  }
+  
+  // Now actually quit (without triggering before-quit again)
+  app.exit(0);
 });
 
 /**

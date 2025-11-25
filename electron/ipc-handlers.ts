@@ -8,6 +8,7 @@
  * @architecture Phase 1, Task 1.1 - Electron Application Shell
  * @created 2025-11-19
  * @updated 2025-11-19 - Added project management handlers (Task 1.3A & 1.3B)
+ * @updated 2025-11-25 - Added preview system handlers (Task 1.4A)
  * @author AI (Cline) + Human Review
  * @confidence 9/10 - Basic IPC handlers for MVP
  * 
@@ -17,6 +18,8 @@
 
 import { ipcMain, app, dialog, BrowserWindow, clipboard, shell } from 'electron';
 import { ProjectManager } from '../src/main/project/ProjectManager';
+import { viteServerManager } from '../src/main/preview/ViteServerManager';
+import { PreviewChannels, ViteServerState } from '../src/main/preview/types';
 import type { CreateProjectParams } from '../src/main/project/types';
 
 // ProjectManager instance (initialized in setupIpcHandlers)
@@ -328,6 +331,205 @@ export async function setupIpcHandlers(): Promise<void> {
     return result.filePaths[0];
   });
 
+  // ===== Preview System Handlers (Task 1.4A) =====
+
+  /**
+   * Start Vite dev server for a project
+   * 
+   * Validates project path, finds available port, and starts Vite.
+   * Emits ready/error/output events to renderer during startup.
+   * 
+   * @param projectPath - Absolute path to project directory
+   * @returns Promise with { success, data?: { port, url }, error?: string }
+   */
+  ipcMain.handle(PreviewChannels.START, async (event, projectPath: string) => {
+    console.log('[IPC] Preview start requested for:', projectPath);
+    
+    try {
+      // Validate projectPath is non-empty string
+      if (!projectPath || typeof projectPath !== 'string') {
+        return {
+          success: false,
+          error: 'Invalid project path',
+        };
+      }
+      
+      // Get the webContents to send events to
+      const webContents = event.sender;
+      
+      // Set up event forwarding to renderer
+      const onReady = (data: { port: number; url: string }) => {
+        webContents.send(PreviewChannels.READY, data);
+      };
+      
+      const onError = (data: { message: string; code?: string }) => {
+        webContents.send(PreviewChannels.ERROR, data);
+      };
+      
+      const onOutput = (data: { line: string; type: 'stdout' | 'stderr' }) => {
+        webContents.send(PreviewChannels.OUTPUT, data);
+      };
+      
+      const onStateChange = (state: ViteServerState) => {
+        webContents.send(PreviewChannels.STATE_CHANGE, state);
+      };
+      
+      // Register event listeners
+      viteServerManager.on('ready', onReady);
+      viteServerManager.on('error', onError);
+      viteServerManager.on('output', onOutput);
+      viteServerManager.on('stateChange', onStateChange);
+      
+      // Start the server
+      const result = await viteServerManager.start({ projectPath });
+      
+      // Remove listeners after start completes (they'll remain for ongoing events)
+      // Note: We keep them attached for ongoing error/output during runtime
+      // They'll be cleaned up on stop or cleanup
+      
+      if (result.success) {
+        console.log('[IPC] Preview server started:', result.url);
+        return {
+          success: true,
+          data: {
+            port: result.port,
+            url: result.url,
+          },
+        };
+      } else {
+        console.error('[IPC] Preview server failed to start:', result.error);
+        return {
+          success: false,
+          error: result.error,
+        };
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[IPC] Error starting preview:', message);
+      return {
+        success: false,
+        error: message,
+      };
+    }
+  });
+
+  /**
+   * Stop Vite dev server
+   * 
+   * Gracefully stops the current Vite server if running.
+   * Safe to call even if no server is running.
+   * 
+   * @returns Promise with { success, error?: string }
+   */
+  ipcMain.handle(PreviewChannels.STOP, async () => {
+    console.log('[IPC] Preview stop requested');
+    
+    try {
+      await viteServerManager.stop();
+      
+      console.log('[IPC] Preview server stopped');
+      return {
+        success: true,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[IPC] Error stopping preview:', message);
+      return {
+        success: false,
+        error: message,
+      };
+    }
+  });
+
+  /**
+   * Restart Vite dev server
+   * 
+   * Stops then restarts the server with the same project path.
+   * Useful after npm install or config changes.
+   * 
+   * @returns Promise with { success, data?: { port, url }, error?: string }
+   */
+  ipcMain.handle(PreviewChannels.RESTART, async (event) => {
+    console.log('[IPC] Preview restart requested');
+    
+    try {
+      // Get the webContents to send events to
+      const webContents = event.sender;
+      
+      // Set up event forwarding
+      const onReady = (data: { port: number; url: string }) => {
+        webContents.send(PreviewChannels.READY, data);
+      };
+      
+      const onError = (data: { message: string; code?: string }) => {
+        webContents.send(PreviewChannels.ERROR, data);
+      };
+      
+      const onStateChange = (state: ViteServerState) => {
+        webContents.send(PreviewChannels.STATE_CHANGE, state);
+      };
+      
+      // Register event listeners
+      viteServerManager.on('ready', onReady);
+      viteServerManager.on('error', onError);
+      viteServerManager.on('stateChange', onStateChange);
+      
+      // Restart the server
+      const result = await viteServerManager.restart();
+      
+      if (result.success) {
+        console.log('[IPC] Preview server restarted:', result.url);
+        return {
+          success: true,
+          data: {
+            port: result.port,
+            url: result.url,
+          },
+        };
+      } else {
+        console.error('[IPC] Preview server restart failed:', result.error);
+        return {
+          success: false,
+          error: result.error,
+        };
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[IPC] Error restarting preview:', message);
+      return {
+        success: false,
+        error: message,
+      };
+    }
+  });
+
+  /**
+   * Get current preview server status
+   * 
+   * Returns the current state of the Vite server.
+   * 
+   * @returns Promise with { success, data: ViteServerState }
+   */
+  ipcMain.handle(PreviewChannels.STATUS, async () => {
+    console.log('[IPC] Preview status requested');
+    
+    try {
+      const state = viteServerManager.getState();
+      
+      return {
+        success: true,
+        data: state,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[IPC] Error getting preview status:', message);
+      return {
+        success: false,
+        error: message,
+      };
+    }
+  });
+
   console.log('[IPC] Handlers registered successfully');
 }
 
@@ -348,5 +550,25 @@ export function cleanupIpcHandlers(): void {
   ipcMain.removeHandler('project:get-files');
   ipcMain.removeHandler('clipboard:write-text');
   ipcMain.removeHandler('shell:show-item-in-folder');
+  
+  // Preview handlers (Task 1.4A)
+  ipcMain.removeHandler(PreviewChannels.START);
+  ipcMain.removeHandler(PreviewChannels.STOP);
+  ipcMain.removeHandler(PreviewChannels.RESTART);
+  ipcMain.removeHandler(PreviewChannels.STATUS);
+  
   console.log('[IPC] Handlers cleaned up');
 }
+
+/**
+ * Clean up preview server
+ * Should be called when app is quitting to ensure no orphan processes
+ */
+export async function cleanupPreviewServer(): Promise<void> {
+  console.log('[IPC] Cleaning up preview server...');
+  await viteServerManager.cleanup();
+  console.log('[IPC] Preview server cleanup complete');
+}
+
+// Export viteServerManager for direct access if needed
+export { viteServerManager };
