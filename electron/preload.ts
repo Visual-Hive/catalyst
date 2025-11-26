@@ -38,6 +38,62 @@ interface PreviewServerState {
 }
 
 /**
+ * Manifest API interface
+ * 
+ * Manages manifest file operations (load, save, initialize).
+ */
+export interface ManifestAPI {
+  /** Load manifest from project */
+  load: (projectPath: string) => Promise<ManifestLoadResult>;
+  
+  /** Save manifest to project */
+  save: (projectPath: string, manifest: any) => Promise<ManifestSaveResult>;
+  
+  /** Check if manifest exists */
+  exists: (projectPath: string) => Promise<ManifestExistsResult>;
+  
+  /** Initialize empty manifest */
+  initialize: (projectPath: string, projectName: string) => Promise<ManifestSaveResult>;
+}
+
+/**
+ * Manifest operation result types
+ */
+export interface ManifestLoadResult {
+  success: boolean;
+  manifest?: any;
+  validationErrors?: ValidationError[];
+  validationWarnings?: ValidationError[];
+  error?: string;
+  errorCode?: 'NOT_FOUND' | 'PARSE_ERROR' | 'READ_ERROR';
+}
+
+export interface ManifestSaveResult {
+  success: boolean;
+  error?: string;
+  errorCode?: 'VALIDATION_FAILED' | 'WRITE_ERROR';
+}
+
+export interface ManifestExistsResult {
+  exists: boolean;
+  hasLowcodeFolder: boolean;
+}
+
+export interface ValidationError {
+  field: string;
+  componentId?: string;
+  componentName?: string;
+  message: string;
+  severity: 'ERROR' | 'WARNING';
+  path?: string;
+  code?: string;
+  suggestion?: string;
+  documentation?: string;
+  hint?: string;
+  level?: 'ERROR' | 'WARNING';
+}
+
+/**
  * Preview API interface
  * 
  * Controls the Vite dev server for project preview.
@@ -108,6 +164,9 @@ export interface ElectronAPI {
   
   // Preview system (Task 1.4A)
   preview: PreviewAPI;
+  
+  // Manifest system (Task 2.2A)
+  manifest: ManifestAPI;
   
   // File operations (to be implemented in future tasks)
   // readFile: (filepath: string) => Promise<string>;
@@ -234,6 +293,23 @@ const electronAPI: ElectronAPI = {
         ipcRenderer.removeListener('preview:state-change', listener);
       };
     },
+  },
+  
+  // Manifest system (Task 2.2A)
+  manifest: {
+    // Load manifest from project
+    load: (projectPath: string) => ipcRenderer.invoke('manifest:load', projectPath),
+    
+    // Save manifest to project
+    save: (projectPath: string, manifest: any) => 
+      ipcRenderer.invoke('manifest:save', projectPath, manifest),
+    
+    // Check if manifest exists
+    exists: (projectPath: string) => ipcRenderer.invoke('manifest:exists', projectPath),
+    
+    // Initialize empty manifest
+    initialize: (projectPath: string, projectName: string) => 
+      ipcRenderer.invoke('manifest:initialize', projectPath, projectName),
   },
   
   // File operations will be added in future tasks

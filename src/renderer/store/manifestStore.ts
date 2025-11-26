@@ -52,6 +52,10 @@ import {
   createComponentMetadata,
 } from '../../core/manifest/types';
 import { useProjectStore } from './projectStore';
+import type { 
+  ValidationError as IPCValidationError,
+  ManifestLoadResult,
+} from '../types/electron';
 
 // Enable Immer support for Map and Set
 enableMapSet();
@@ -94,6 +98,14 @@ export const useManifestStore = create<ManifestState>()(
     manifest: null,
     selectedComponentId: null,
     expandedComponentIds: new Set<string>(),
+    
+    // Validation state (Task 2.2B)
+    validationErrors: [] as IPCValidationError[],
+    validationWarnings: [] as IPCValidationError[],
+    saveBlocked: false,
+    isLoading: false,
+    error: null,
+    errorCode: undefined,
 
     /**
      * Load manifest from object
@@ -111,10 +123,113 @@ export const useManifestStore = create<ManifestState>()(
     },
 
     /**
-     * Save manifest to file (debounced)
+     * Load manifest from file via IPC (Task 2.2B)
+     * 
+     * Called automatically when project opens.
+     * Handles missing manifest, validation errors, corrupted JSON, etc.
+     * 
+     * @param projectPath - Absolute path to project directory
+     * @returns Promise that resolves when load completes
+     */
+    loadFromFile: async (projectPath: string) => {
+      set((state) => {
+        state.isLoading = true;
+        state.error = null;
+        state.validationErrors = [];
+        state.validationWarnings = [];
+      });
+
+      try {
+        const result: ManifestLoadResult = await window.electronAPI.manifest.load(projectPath);
+
+        if (!result.success) {
+          set((state) => {
+            state.isLoading = false;
+            state.error = result.error || 'Failed to load manifest';
+            state.errorCode = result.errorCode;
+          });
+          return;
+        }
+
+        set((state) => {
+          state.manifest = result.manifest || null;
+          state.isLoading = false;
+          state.validationErrors = result.validationErrors || [];
+          state.validationWarnings = result.validationWarnings || [];
+          state.saveBlocked = (result.validationErrors?.length || 0) > 0;
+          state.selectedComponentId = null;
+          state.expandedComponentIds = new Set<string>();
+        });
+      } catch (error) {
+        set((state) => {
+          state.isLoading = false;
+          state.error = error instanceof Error ? error.message : 'Unknown error';
+        });
+      }
+    },
+
+    /**
+     * Clear manifest state (Task 2.2B)
+     * 
+     * Called when project closes.
+     * Resets all manifest-related state to initial values.
+     */
+    clearManifest: () => {
+      set((state) => {
+        state.manifest = null;
+        state.selectedComponentId = null;
+        state.expandedComponentIds = new Set<string>();
+        state.validationErrors = [];
+        state.validationWarnings = [];
+        state.saveBlocked = false;
+        state.error = null;
+        state.errorCode = undefined;
+      });
+    },
+
+    /**
+     * Initialize empty manifest for project (Task 2.2B)
+     * 
+     * Creates .lowcode folder and empty manifest file.
+     * Called from MissingManifestDialog when user chooses to initialize.
+     * 
+     * @param projectPath - Absolute path to project directory
+     * @param projectName - Name for the project
+     * @returns Promise that resolves when initialization completes
+     */
+    initializeManifest: async (projectPath: string, projectName: string) => {
+      try {
+        const result = await window.electronAPI.manifest.initialize(projectPath, projectName);
+
+        if (!result.success) {
+          set((state) => {
+            state.error = result.error || 'Failed to initialize manifest';
+          });
+          return;
+        }
+
+        // After initialization, load the new manifest
+        await get().loadFromFile(projectPath);
+      } catch (error) {
+        set((state) => {
+          state.error = error instanceof Error ? error.message : 'Unknown error';
+        });
+      }
+    },
+
+    /**
+     * Save manifest to file (debounced) - Task 2.2C
      * 
      * Validation occurs before save. If validation fails,
      * the save is blocked and errors are logged.
+     * 
+     * DEBOUNCING:
+     * - Saves are debounced 500ms to prevent excessive writes
+     * - Each mutation triggers this, but only last one executes
+     * 
+     * VALIDATION:
+     * - Blocks save if ERROR-level validation issues exist
+     * - Allows save with WARNING-level issues
      * 
      * @returns Promise that resolves when save completes
      * @throws Error if no manifest loaded or validation fails
@@ -123,14 +238,14 @@ export const useManifestStore = create<ManifestState>()(
       const state = get();
       
       if (!state.manifest) {
-        throw new Error('No manifest loaded');
+        console.warn('[ManifestStore] Cannot save: No manifest loaded');
+        return;
       }
 
-      // Validate before saving
-      const validation = state.validate();
-      if (!validation.isValid) {
-        console.error('Manifest validation failed:', validation.errors);
-        throw new Error(`Validation failed: ${validation.errors[0].message}`);
+      // Check if save is blocked due to validation errors
+      if (state.saveBlocked || (state.validationErrors && state.validationErrors.length > 0)) {
+        console.warn('[ManifestStore] Save blocked: Validation errors exist');
+        return;
       }
 
       // Debounce the save operation
@@ -145,25 +260,27 @@ export const useManifestStore = create<ManifestState>()(
             const currentProject = useProjectStore.getState().currentProject;
             
             if (!currentProject) {
-              throw new Error('No project loaded');
+              console.warn('[ManifestStore] Cannot save: No project loaded');
+              resolve();
+              return;
             }
 
-            // Save manifest to .lowcode/manifest.json
-            const manifestPath = `${currentProject.path}/.lowcode/manifest.json`;
-            const manifestContent = JSON.stringify(state.manifest, null, 2);
+            // Save via IPC (Task 2.2C)
+            const result = await window.electronAPI.manifest.save(
+              currentProject.path,
+              state.manifest
+            );
             
-            // Use fs module through Node.js (will be exposed via IPC in future)
-            // For now, log the save operation - actual file writing will be implemented
-            // in the ProjectManager when we integrate manifest management
-            console.log('Manifest would be saved to:', manifestPath);
-            console.log('Manifest content:', manifestContent);
-            
-            // TODO: Implement actual file writing via IPC
-            // await window.electronAPI.writeFile(manifestPath, manifestContent);
-            
-            resolve();
+            if (result.success) {
+              console.log('[ManifestStore] Manifest saved successfully');
+              resolve();
+            } else {
+              console.error('[ManifestStore] Save failed:', result.error);
+              reject(new Error(result.error || 'Failed to save manifest'));
+            }
           } catch (error) {
-            console.error('Failed to save manifest:', error);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[ManifestStore] Error saving manifest:', message);
             reject(error);
           }
         }, SAVE_DEBOUNCE_MS);

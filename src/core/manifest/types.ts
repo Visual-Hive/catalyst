@@ -226,8 +226,19 @@ export interface ManifestState {
   selectedComponentId: string | null;
   expandedComponentIds: Set<string>;
   
+  // Validation state (Task 2.2B)
+  validationErrors: any[]; // ValidationError from electron types
+  validationWarnings: any[]; // ValidationError from electron types
+  saveBlocked: boolean;
+  isLoading: boolean;
+  error: string | null;
+  errorCode?: 'NOT_FOUND' | 'PARSE_ERROR' | 'READ_ERROR';
+  
   // Actions
   loadManifest: (manifest: Manifest) => void;
+  loadFromFile: (projectPath: string) => Promise<void>;
+  clearManifest: () => void;
+  initializeManifest: (projectPath: string, projectName: string) => Promise<void>;
   saveManifest: () => Promise<void>;
   
   // Component CRUD

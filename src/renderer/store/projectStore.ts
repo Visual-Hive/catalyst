@@ -559,6 +559,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
    * 3. Load manifest and settings
    * 4. Set as current project
    * 5. Add to recent projects
+   * 6. Load manifest (Task 2.2B)
    * 
    * @param projectPath - Absolute path to project directory
    * @returns Promise<boolean> - true if successful, false otherwise
@@ -575,6 +576,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         
         // Reload recent projects to include this one
         await get().loadRecentProjects();
+        
+        // Load manifest (Task 2.2B)
+        const { useManifestStore } = await import('./manifestStore');
+        await useManifestStore.getState().loadFromFile(projectPath);
         
         return true;
       } else {

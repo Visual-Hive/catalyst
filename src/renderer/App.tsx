@@ -32,8 +32,10 @@ import React, { useEffect, useRef } from 'react';
 import { Layout } from './components/Layout';
 import { NewProjectDialog } from './components/NewProjectDialog';
 import { OpenProjectDialog } from './components/OpenProjectDialog';
+import { MissingManifestDialog } from './components/MissingManifestDialog';
 import { useProjectStore } from './store/projectStore';
 import { usePreviewStore } from './store/previewStore';
+import { useManifestStore } from './store/manifestStore';
 
 /**
  * Root application component
@@ -68,6 +70,9 @@ function App() {
   const stopPreview = usePreviewStore((state) => state.stopPreview);
   const initializeListeners = usePreviewStore((state) => state.initializeListeners);
   
+  // Get manifest store actions (Task 2.2B)
+  const clearManifest = useManifestStore((state) => state.clearManifest);
+  
   // Track the previous project path for detecting project changes
   const previousProjectPath = useRef<string | null>(null);
   
@@ -96,9 +101,10 @@ function App() {
     
     // Project changed
     if (currentPath !== previousPath) {
-      // If there was a previous project, stop its preview
+      // If there was a previous project, stop its preview and clear manifest
       if (previousPath) {
         stopPreview();
+        clearManifest(); // Task 2.2B: Clear manifest on project close
       }
       
       // If there's a new project, start its preview
@@ -109,7 +115,7 @@ function App() {
       // Update the ref for next comparison
       previousProjectPath.current = currentPath;
     }
-  }, [currentProject?.path, startPreview, stopPreview]);
+  }, [currentProject?.path, startPreview, stopPreview, clearManifest]);
 
   /**
    * Handle global keyboard shortcuts
@@ -156,6 +162,7 @@ function App() {
       <Layout />
       <NewProjectDialog />
       <OpenProjectDialog />
+      <MissingManifestDialog />
     </>
   );
 }

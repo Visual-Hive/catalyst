@@ -21,6 +21,7 @@ import { ProjectManager } from '../src/main/project/ProjectManager';
 import { viteServerManager } from '../src/main/preview/ViteServerManager';
 import { PreviewChannels, ViteServerState } from '../src/main/preview/types';
 import type { CreateProjectParams } from '../src/main/project/types';
+import { registerManifestHandlers } from './manifest-handlers';
 
 // ProjectManager instance (initialized in setupIpcHandlers)
 let projectManager: ProjectManager;
@@ -530,6 +531,9 @@ export async function setupIpcHandlers(): Promise<void> {
     }
   });
 
+  // ===== Manifest Handlers (Task 2.2A) =====
+  registerManifestHandlers();
+
   console.log('[IPC] Handlers registered successfully');
 }
 
@@ -556,6 +560,12 @@ export function cleanupIpcHandlers(): void {
   ipcMain.removeHandler(PreviewChannels.STOP);
   ipcMain.removeHandler(PreviewChannels.RESTART);
   ipcMain.removeHandler(PreviewChannels.STATUS);
+  
+  // Manifest handlers (Task 2.2A)
+  ipcMain.removeHandler('manifest:load');
+  ipcMain.removeHandler('manifest:save');
+  ipcMain.removeHandler('manifest:exists');
+  ipcMain.removeHandler('manifest:initialize');
   
   console.log('[IPC] Handlers cleaned up');
 }
