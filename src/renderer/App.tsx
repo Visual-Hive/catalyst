@@ -33,9 +33,11 @@ import { Layout } from './components/Layout';
 import { NewProjectDialog } from './components/NewProjectDialog';
 import { OpenProjectDialog } from './components/OpenProjectDialog';
 import { MissingManifestDialog } from './components/MissingManifestDialog';
+import { AIPromptDialog } from './components/AIGeneration';
 import { useProjectStore } from './store/projectStore';
 import { usePreviewStore } from './store/previewStore';
 import { useManifestStore } from './store/manifestStore';
+import { useAIStore } from './store/aiStore';
 
 /**
  * Root application component
@@ -73,6 +75,13 @@ function App() {
   // Get manifest store actions (Task 2.2B)
   const clearManifest = useManifestStore((state) => state.clearManifest);
   
+  // Get AI store actions (Task 2.4E)
+  const initializeAI = useAIStore((state) => state.initialize);
+  const cleanupAI = useAIStore((state) => state.cleanup);
+  
+  // AI dialog state (managed at App level for global keyboard shortcut)
+  const [aiDialogOpen, setAiDialogOpen] = React.useState(false);
+  
   // Track the previous project path for detecting project changes
   const previousProjectPath = useRef<string | null>(null);
   
@@ -88,11 +97,11 @@ function App() {
   }, [initializeListeners]);
   
   /**
-   * Handle preview lifecycle based on project changes
+   * Handle preview and AI lifecycle based on project changes
    * 
    * BEHAVIOR:
-   * - When a project is opened: Start preview automatically
-   * - When a project is closed: Stop preview
+   * - When a project is opened: Start preview and initialize AI
+   * - When a project is closed: Stop preview and cleanup AI
    * - When switching projects: Stop old, start new
    */
   useEffect(() => {
@@ -101,21 +110,23 @@ function App() {
     
     // Project changed
     if (currentPath !== previousPath) {
-      // If there was a previous project, stop its preview and clear manifest
+      // If there was a previous project, stop its preview, clear manifest, cleanup AI
       if (previousPath) {
         stopPreview();
         clearManifest(); // Task 2.2B: Clear manifest on project close
+        cleanupAI(); // Task 2.4E: Cleanup AI on project close
       }
       
-      // If there's a new project, start its preview
+      // If there's a new project, start its preview and initialize AI
       if (currentPath) {
         startPreview(currentPath);
+        initializeAI(currentPath); // Task 2.4E: Initialize AI on project open
       }
       
       // Update the ref for next comparison
       previousProjectPath.current = currentPath;
     }
-  }, [currentProject?.path, startPreview, stopPreview, clearManifest]);
+  }, [currentProject?.path, startPreview, stopPreview, clearManifest, initializeAI, cleanupAI]);
 
   /**
    * Handle global keyboard shortcuts
@@ -140,10 +151,16 @@ function App() {
         
         // Trigger refresh via window-stored function (from FileTree)
         const refreshFn = (window as any).__fileTreeRefresh;
-        if (refreshFn && typeof refreshFn === 'function'
-
-) {
+        if (refreshFn && typeof refreshFn === 'function') {
           refreshFn();
+        }
+      }
+      
+      // Cmd+Shift+G / Ctrl+Shift+G - Open AI Generate dialog (Task 2.4E)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'g') {
+        e.preventDefault();
+        if (currentProject) {
+          setAiDialogOpen(true);
         }
       }
     };
@@ -155,7 +172,7 @@ function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [openDialog, openOpenDialog]);
+  }, [openDialog, openOpenDialog, currentProject]);
 
   return (
     <>
@@ -163,6 +180,11 @@ function App() {
       <NewProjectDialog />
       <OpenProjectDialog />
       <MissingManifestDialog />
+      {/* AI Prompt Dialog - can be opened via keyboard shortcut Cmd+Shift+G */}
+      <AIPromptDialog
+        isOpen={aiDialogOpen}
+        onClose={() => setAiDialogOpen(false)}
+      />
     </>
   );
 }

@@ -35,15 +35,18 @@
  * @performance-critical false
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   PlusIcon,
   FolderOpenIcon,
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
   Cog6ToothIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { useProjectStore } from '../store/projectStore';
+import { AIGenerateButton } from './AIGeneration';
+import { SettingsDialog } from './Settings';
 
 /**
  * Props for individual toolbar button
@@ -121,6 +124,17 @@ export function Toolbar() {
   // Get dialog actions from project store
   const openDialog = useProjectStore((state) => state.openDialog);
   const openOpenDialog = useProjectStore((state) => state.openOpenDialog);
+  const currentProject = useProjectStore((state) => state.currentProject);
+  
+  // Settings dialog state
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'project' | 'ai'>('project');
+  
+  // Open settings at specific tab
+  const openSettings = (tab: 'project' | 'ai' = 'project') => {
+    setSettingsTab(tab);
+    setSettingsOpen(true);
+  };
 
   return (
     <div
@@ -172,12 +186,28 @@ export function Toolbar() {
       {/* Spacer - pushes next items to the right */}
       <div className="flex-1" aria-hidden="true" />
 
+      {/* AI Generate Button (only show when project is open) */}
+      {currentProject && (
+        <>
+          <AIGenerateButton />
+          <div className="w-px h-6 bg-gray-300 mx-2" aria-hidden="true" />
+        </>
+      )}
+
       {/* Right section - Settings */}
       <ToolbarButton
         icon={<Cog6ToothIcon className="w-5 h-5" />}
         label="Settings"
         shortcut="Cmd+,"
-        disabled={true}
+        onClick={() => openSettings('project')}
+        disabled={!currentProject}
+      />
+      
+      {/* Settings Dialog */}
+      <SettingsDialog
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialTab={settingsTab}
       />
     </div>
   );
