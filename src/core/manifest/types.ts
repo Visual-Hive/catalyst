@@ -1,44 +1,70 @@
 /**
  * @file types.ts
- * @description Type definitions for Rise manifest (Level 1 - MVP)
+ * @description Type definitions for Rise manifest (Level 1 & Level 1.5)
  * 
- * @architecture Phase 2, Task 2.1 - Component Tree UI
+ * @architecture Phase 2, Task 2.1 - Component Tree UI (Level 1)
+ * @architecture Phase 4, Task 4.0 - Logic System Foundation (Level 1.5)
  * @created 2025-11-25
+ * @updated 2025-11-29
  * @author AI (Cline) + Human Review
- * @confidence 9/10 - Based on COMPONENT_SCHEMA.md Level 1
+ * @confidence 9/10 - Based on COMPONENT_SCHEMA.md and phase-4-micro-logic-editor.md
  * 
  * @see docs/COMPONENT_SCHEMA.md - Level 1 schema specification
  * @see docs/SCHEMA_LEVELS.md - Progressive schema levels
+ * @see .implementation/phase-4-logic-editor/phase-4-micro-logic-editor.md - Level 1.5 spec
  * 
  * PROBLEM SOLVED:
  * - Type-safe manifest structure for Level 1 MVP
  * - Component hierarchy representation
  * - Property definitions with static values and props
  * - Validation and error handling types
+ * - Level 1.5: Events, page state, and visual logic flows
  * 
  * SOLUTION:
- * - TypeScript interfaces matching Level 1 schema
- * - No expressions, state, or event handlers (Level 2)
- * - No data connections or advanced features (Level 3)
- * - Clean, simple types for MVP
+ * - TypeScript interfaces matching Level 1 & 1.5 schema
+ * - Level 1: Static properties, no state/events
+ * - Level 1.5: onClick events, page state, basic flows
+ * - No expressions (Level 2) or data connections (Level 3)
  * 
- * LEVEL 1 FEATURES ONLY:
+ * LEVEL 1 FEATURES:
  * - Static property values
  * - Props (component inputs)
  * - Basic styling with Tailwind
  * - Component hierarchy (max 5 levels)
  * - Metadata tracking
  * 
+ * LEVEL 1.5 FEATURES (Micro Logic Editor):
+ * - onClick events only
+ * - Page-level state variables
+ * - Visual logic flows (3 node types: setState, alert, console)
+ * - Static values only (no expressions)
+ * 
  * @security-critical false
  * @performance-critical false
  */
+
+import type {
+  ComponentEvents,
+  PageState,
+  FlowsMap,
+} from '../logic/types';
+
+/**
+ * Schema level type
+ * 
+ * - Level 1: MVP with static properties only
+ * - Level 1.5: Micro Logic Editor (onClick events, page state, basic flows)
+ * - Level 2: Full logic system with expressions (future)
+ * - Level 3: Data connections and advanced features (future)
+ */
+export type SchemaLevel = 1 | 1.5 | 2 | 3;
 
 /**
  * Schema version and level
  */
 export interface ManifestVersion {
   schemaVersion: string; // e.g., "1.0.0"
-  level: 1; // Level 1 for MVP
+  level: SchemaLevel; // Level 1, 1.5, 2, or 3
 }
 
 /**
@@ -138,7 +164,10 @@ export interface ComponentMetadata {
 }
 
 /**
- * Component definition (Level 1)
+ * Component definition (Level 1 & Level 1.5)
+ * 
+ * Level 1: Static properties, styling, children
+ * Level 1.5: Adds events field for onClick handlers
  */
 export interface Component {
   id: string; // Unique component ID (e.g., "comp_button_001")
@@ -153,16 +182,77 @@ export interface Component {
   children: string[]; // Array of child component IDs
   
   metadata: ComponentMetadata; // Creation and tracking info
+  
+  /**
+   * Event handlers for this component (Level 1.5+)
+   * Maps event type to flow reference
+   * 
+   * Level 1.5: Only onClick is supported
+   * Level 2+: Will add onChange, onSubmit, onMount, etc.
+   * 
+   * @example
+   * {
+   *   onClick: { flowId: "flow_001" }
+   * }
+   */
+  events?: ComponentEvents;
 }
 
 /**
- * Complete manifest structure (Level 1)
+ * Complete manifest structure (Level 1 & Level 1.5)
+ * 
+ * Level 1: Basic structure with components
+ * Level 1.5: Adds pageState and flows for logic editor
  */
 export interface Manifest extends ManifestVersion {
   metadata: ProjectMetadata;
   buildConfig: BuildConfig;
   plugins: PluginConfig;
   components: Record<string, Component>; // Keyed by component ID
+  
+  /**
+   * Page-level reactive state (Level 1.5+)
+   * 
+   * Simple state variables accessible to all components on the page.
+   * Each variable has a type and initial value.
+   * 
+   * Level 1.5 constraints:
+   * - Only primitive types: string, number, boolean
+   * - No expressions in values
+   * - No cross-page state sharing
+   * 
+   * @example
+   * {
+   *   "clickCount": { type: "number", initialValue: 0 },
+   *   "userName": { type: "string", initialValue: "" }
+   * }
+   */
+  pageState?: PageState;
+  
+  /**
+   * Logic flows (Level 1.5+)
+   * 
+   * Visual logic sequences that execute when events fire.
+   * Each flow has a trigger, nodes (actions), and edges (connections).
+   * 
+   * Level 1.5 constraints:
+   * - Only onClick triggers
+   * - Only 3 node types: setState, alert, console
+   * - Only static values (no expressions)
+   * - Single-step execution (no chaining)
+   * 
+   * @example
+   * {
+   *   "flow_001": {
+   *     id: "flow_001",
+   *     name: "Handle Click",
+   *     trigger: { type: "onClick", componentId: "comp_button_001" },
+   *     nodes: [...],
+   *     edges: [...]
+   *   }
+   * }
+   */
+  flows?: FlowsMap;
 }
 
 /**
@@ -273,6 +363,9 @@ export interface ManifestState {
 
 /**
  * Default empty manifest
+ * 
+ * Creates a new manifest at Level 1 by default.
+ * Use createEmptyLevel15Manifest() for Level 1.5.
  */
 export const createEmptyManifest = (): Manifest => ({
   schemaVersion: '1.0.0',
@@ -295,6 +388,71 @@ export const createEmptyManifest = (): Manifest => ({
   },
   components: {},
 });
+
+/**
+ * Create an empty Level 1.5 manifest with logic system support
+ * 
+ * Includes empty pageState and flows sections ready for the logic editor.
+ */
+export const createEmptyLevel15Manifest = (): Manifest => ({
+  schemaVersion: '1.0.0',
+  level: 1.5,
+  metadata: {
+    projectName: 'New Project',
+    framework: 'react',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  buildConfig: {
+    bundler: 'vite',
+    cssFramework: 'tailwind',
+  },
+  plugins: {
+    framework: {
+      name: '@rise/plugin-react',
+      version: '1.0.0',
+    },
+  },
+  components: {},
+  pageState: {},
+  flows: {},
+});
+
+/**
+ * Upgrade a Level 1 manifest to Level 1.5
+ * 
+ * Adds empty pageState and flows sections if they don't exist.
+ * Preserves all existing data.
+ * 
+ * @param manifest - Level 1 manifest to upgrade
+ * @returns Level 1.5 manifest
+ */
+export const upgradeToLevel15 = (manifest: Manifest): Manifest => ({
+  ...manifest,
+  level: 1.5,
+  pageState: manifest.pageState || {},
+  flows: manifest.flows || {},
+});
+
+/**
+ * Check if a manifest is Level 1.5 or higher
+ * 
+ * @param manifest - Manifest to check
+ * @returns True if manifest supports logic features
+ */
+export const hasLogicSupport = (manifest: Manifest): boolean => {
+  return manifest.level >= 1.5;
+};
+
+/**
+ * Check if a component has any events configured
+ * 
+ * @param component - Component to check
+ * @returns True if component has at least one event handler
+ */
+export const hasEvents = (component: Component): boolean => {
+  return !!component.events && Object.keys(component.events).length > 0;
+};
 
 /**
  * Generate unique component ID

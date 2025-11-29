@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1.0.0",
+  "level": 1.5,
+  "metadata": {
+    "projectName": "Level 1.5 Test Project",
+    "framework": "react",
+    "createdAt": "2025-11-29T00:00:00.000Z",
+    "updatedAt": "2025-11-29T00:00:00.000Z"
+  },
+  "buildConfig": {
+    "bundler": "vite",
+    "cssFramework": "tailwind"
+  },
+  "plugins": {
+    "framework": {
+      "name": "@rise/plugin-react",
+      "version": "1.0.0"
+    }
+  },
+  "components": {
+    "comp_root_001": {
+      "id": "comp_root_001",
+      "displayName": "App",
+      "type": "div",
+      "properties": {
+        "className": {
+          "type": "static",
+          "value": "app-container",
+          "dataType": "string"
+        }
+      },
+      "styling": {
+        "baseClasses": ["p-4", "min-h-screen", "bg-gray-100"]
+      },
+      "children": ["comp_button_001", "comp_display_001"],
+      "metadata": {
+        "createdAt": "2025-11-29T00:00:00.000Z",
+        "updatedAt": "2025-11-29T00:00:00.000Z",
+        "author": "user",
+        "version": "1.0.0"
+      }
+    },
+    "comp_button_001": {
+      "id": "comp_button_001",
+      "displayName": "ClickButton",
+      "type": "button",
+      "properties": {
+        "children": {
+          "type": "static",
+          "value": "Click Me!",
+          "dataType": "string"
+        }
+      },
+      "styling": {
+        "baseClasses": ["px-4", "py-2", "bg-blue-500", "text-white", "rounded", "hover:bg-blue-600"]
+      },
+      "children": [],
+      "metadata": {
+        "createdAt": "2025-11-29T00:00:00.000Z",
+        "updatedAt": "2025-11-29T00:00:00.000Z",
+        "author": "user",
+        "version": "1.0.0"
+      },
+      "events": {
+        "onClick": {
+          "flowId": "flow_handleClick_001"
+        }
+      }
+    },
+    "comp_display_001": {
+      "id": "comp_display_001",
+      "displayName": "CountDisplay",
+      "type": "div",
+      "properties": {
+        "children": {
+          "type": "static",
+          "value": "Count: 0",
+          "dataType": "string"
+        }
+      },
+      "styling": {
+        "baseClasses": ["mt-4", "text-lg", "font-bold"]
+      },
+      "children": [],
+      "metadata": {
+        "createdAt": "2025-11-29T00:00:00.000Z",
+        "updatedAt": "2025-11-29T00:00:00.000Z",
+        "author": "user",
+        "version": "1.0.0"
+      }
+    }
+  },
+  "pageState": {
+    "clickCount": {
+      "type": "number",
+      "initialValue": 0
+    },
+    "message": {
+      "type": "string",
+      "initialValue": "Welcome!"
+    },
+    "isActive": {
+      "type": "boolean",
+      "initialValue": false
+    }
+  },
+  "flows": {
+    "flow_handleClick_001": {
+      "id": "flow_handleClick_001",
+      "name": "Handle Button Click",
+      "trigger": {
+        "type": "onClick",
+        "componentId": "comp_button_001"
+      },
+      "nodes": [
+        {
+          "id": "node_event_001",
+          "type": "event",
+          "position": { "x": 100, "y": 200 },
+          "config": {
+            "eventType": "onClick",
+            "componentId": "comp_button_001"
+          }
+        },
+        {
+          "id": "node_setState_001",
+          "type": "setState",
+          "position": { "x": 350, "y": 150 },
+          "config": {
+            "variable": "clickCount",
+            "value": {
+              "type": "static",
+              "value": 1
+            }
+          }
+        },
+        {
+          "id": "node_console_001",
+          "type": "console",
+          "position": { "x": 350, "y": 300 },
+          "config": {
+            "level": "log",
+            "message": {
+              "type": "static",
+              "value": "Button was clicked!"
+            }
+          }
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge_001",
+          "source": "node_event_001",
+          "target": "node_setState_001"
+        },
+        {
+          "id": "edge_002",
+          "source": "node_event_001",
+          "target": "node_console_001"
+        }
+      ]
+    }
+  }
+}

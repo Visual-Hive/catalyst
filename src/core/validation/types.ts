@@ -1,19 +1,32 @@
 /**
  * @file types.ts
- * @description Type definitions for Level 1 (MVP) schema validation system
+ * @description Type definitions for Level 1 & Level 1.5 schema validation system
  * 
  * @architecture Phase 0, Task 0.3 - Schema Level 1 Validator
+ * @architecture Phase 4, Task 4.0 - Logic System Foundation (Level 1.5)
  * @created 2025-11-19
+ * @updated 2025-11-29
  * @author AI (Cline) + Human Review
  * @confidence 10/10 - Straightforward type definitions
  * 
  * @see docs/SCHEMA_LEVELS.md - Level 1 specification
  * @see docs/COMPONENT_SCHEMA.md - Complete schema reference
  * @see .implementation/phase-0-foundation/task-0.3-schema-validator.md
+ * @see .implementation/phase-4-logic-editor/task-4.0-logic-system-foundation.md
  * 
  * @security-critical false
  * @performance-critical false
  */
+
+import type {
+  ComponentEvents,
+  PageState,
+  FlowsMap,
+  Flow,
+  FlowNode,
+  FlowEdge,
+  StateVariable,
+} from '../logic/types';
 
 /**
  * Severity levels for validation messages.
@@ -98,7 +111,7 @@ export interface ValidationResult {
   /** Array of WARNING-level validation issues (doesn't block) */
   warnings: ValidationError[];
   
-  /** Schema level validated against (1 for MVP) */
+  /** Schema level validated against (1, 1.5, 2, or 3) */
   level: number;
   
   /** Number of components validated */
@@ -109,6 +122,12 @@ export interface ValidationResult {
   
   /** Maximum tree depth found during validation */
   maxDepth?: number;
+  
+  /** Number of state variables validated (Level 1.5+) */
+  stateVariableCount?: number;
+  
+  /** Number of flows validated (Level 1.5+) */
+  flowCount?: number;
 }
 
 /**
@@ -160,6 +179,9 @@ export interface ValidationRules {
  * 
  * NOTE: This is a validation-focused subset, not the complete component schema.
  * See docs/COMPONENT_SCHEMA.md for full schema specification.
+ * 
+ * Level 1: Basic static components
+ * Level 1.5: Adds pageState, flows, and component events
  */
 export interface ComponentManifest {
   schemaVersion: string;
@@ -169,7 +191,20 @@ export interface ComponentManifest {
   buildConfig?: Record<string, any>;
   plugins?: Record<string, any>;
   
-  // Level 2/3 features (should be absent in Level 1)
+  // Level 1.5 features
+  /**
+   * Page-level state variables (Level 1.5+)
+   * Key is variable name, value is StateVariable definition
+   */
+  pageState?: PageState;
+  
+  /**
+   * Logic flows (Level 1.5+)
+   * Key is flow ID, value is Flow definition
+   */
+  flows?: FlowsMap;
+  
+  // Level 2/3 features (should be absent in Level 1 and 1.5)
   globalFunctions?: any;
   globalState?: any;
   eventHandlers?: any;
@@ -177,6 +212,7 @@ export interface ComponentManifest {
   routes?: any;
   api?: any;
   database?: any;
+  expressions?: any;
 }
 
 /**
@@ -193,6 +229,9 @@ export interface ManifestMetadata {
 
 /**
  * Component structure (minimal type for validation).
+ * 
+ * Level 1: Basic properties and styling
+ * Level 1.5: Adds events field for onClick handlers
  */
 export interface Component {
   id: string;
@@ -204,8 +243,16 @@ export interface Component {
   styling?: ComponentStyling;
   metadata?: ComponentMetadata;
   
-  // Level 2/3 features (should be absent in Level 1)
-  eventHandlers?: any;
+  // Level 1.5 features
+  /**
+   * Event handlers for this component (Level 1.5+)
+   * Maps event type to flow reference
+   * Level 1.5: Only onClick is supported
+   */
+  events?: ComponentEvents;
+  
+  // Level 2/3 features (should be absent in Level 1 and 1.5)
+  eventHandlers?: any;  // Old-style handlers (deprecated)
   localState?: any;
   dataConnections?: any;
   codeReview?: any;
@@ -246,3 +293,97 @@ export interface ComponentMetadata {
   version?: string;
   description?: string;
 }
+
+// ============================================================
+// LEVEL 1.5 VALIDATION TYPES
+// ============================================================
+
+/**
+ * Level 1.5 validation rules configuration
+ * 
+ * Extends Level 1 rules with logic system constraints
+ */
+export interface Level15ValidationRules {
+  schema: {
+    version: string;
+    level: number;
+    requiredFields: string[];
+  };
+  
+  component: {
+    requiredFields: string[];
+    validTypes: string[];
+    maxDepth: number;
+    maxChildren: number;
+    idPattern: RegExp;
+    namePattern: RegExp;
+  };
+  
+  property: {
+    allowedTypes: string[];
+    blockedTypes: string[];
+    allowedDataTypes: string[];
+  };
+  
+  /** Level 1.5 specific: State variable rules */
+  stateVariable: {
+    /** Allowed state variable types */
+    allowedTypes: string[];
+    /** Pattern for valid variable names */
+    namePattern: RegExp;
+    /** Maximum number of state variables */
+    maxVariables: number;
+  };
+  
+  /** Level 1.5 specific: Flow rules */
+  flow: {
+    /** Allowed event types (Level 1.5: only onClick) */
+    allowedEventTypes: string[];
+    /** Allowed node types (Level 1.5: event, setState, alert, console) */
+    allowedNodeTypes: string[];
+    /** Maximum nodes per flow */
+    maxNodesPerFlow: number;
+    /** Maximum total flows */
+    maxFlows: number;
+    /** Pattern for valid flow IDs */
+    idPattern: RegExp;
+  };
+  
+  /** Level 1.5 specific: Value rules */
+  value: {
+    /** Allowed value types (Level 1.5: only static) */
+    allowedTypes: string[];
+    /** Blocked value types (Level 1.5: expression) */
+    blockedTypes: string[];
+  };
+  
+  blockedFeatures: string[];
+}
+
+/**
+ * Flow-specific validation error
+ */
+export interface FlowValidationError extends ValidationError {
+  flowId?: string;
+  flowName?: string;
+  nodeId?: string;
+  edgeId?: string;
+}
+
+/**
+ * State variable validation error
+ */
+export interface StateValidationError extends ValidationError {
+  variableName?: string;
+}
+
+// Re-export logic types for convenience
+export type {
+  ComponentEvents,
+  PageState,
+  FlowsMap,
+  Flow,
+  FlowNode,
+  FlowEdge,
+  StateVariable,
+};
