@@ -53,8 +53,9 @@ export type PanelId = 'navigator' | 'editor' | 'properties';
 
 /**
  * Tab identifiers for the editor panel
+ * Phase 4: Added 'logic' tab for visual logic editing
  */
-export type TabId = 'preview' | 'code' | 'console';
+export type TabId = 'preview' | 'code' | 'console' | 'logic';
 
 /**
  * Panel size configuration

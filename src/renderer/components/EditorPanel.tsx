@@ -23,6 +23,7 @@
  * - Preview: Live component preview via Vite dev server
  * - Code: Generated code viewer (Task 3.1+)
  * - Console: Debug output (Phase 3+)
+ * - Logic: Visual logic editor (Phase 4)
  * 
  * @performance O(1) tab switching, lazy loading of tab content
  * @security-critical false
@@ -34,12 +35,14 @@ import {
   EyeIcon,
   CodeBracketIcon,
   CommandLineIcon,
+  BoltIcon,
 } from '@heroicons/react/24/outline';
 import { useLayout } from '../hooks/useLayout';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { PreviewPanel } from './Preview';
 import { ConsolePanel } from './Console';
 import { CodePanel } from './CodeViewer';
+import { LogicPanel } from './LogicEditor';
 
 
 /**
@@ -52,6 +55,7 @@ import { CodePanel } from './CodeViewer';
  * - Cmd+Shift+P: Switch to Preview tab
  * - Cmd+Shift+C: Switch to Code tab
  * - Cmd+Shift+O: Switch to Console tab
+ * - Cmd+Shift+L: Switch to Logic tab
  * 
  * @returns EditorPanel component
  * 
@@ -70,12 +74,14 @@ export function EditorPanel() {
     preview: 0,
     code: 1,
     console: 2,
+    logic: 3,
   };
 
-  const indexToTabId: Record<number, 'preview' | 'code' | 'console'> = {
+  const indexToTabId: Record<number, 'preview' | 'code' | 'console' | 'logic'> = {
     0: 'preview',
     1: 'code',
     2: 'console',
+    3: 'logic',
   };
 
   // Get current tab index
@@ -103,6 +109,11 @@ export function EditorPanel() {
   useHotkeys('mod+shift+o', (e) => {
     e.preventDefault();
     setActiveTab('console');
+  }, [setActiveTab]);
+
+  useHotkeys('mod+shift+l', (e) => {
+    e.preventDefault();
+    setActiveTab('logic');
   }, [setActiveTab]);
 
   return (
@@ -158,18 +169,36 @@ export function EditorPanel() {
             <CommandLineIcon className="w-4 h-4" />
             <span>Console</span>
           </Tab>
+
+          {/* Logic Tab */}
+          <Tab
+            className={({ selected }) =>
+              `flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t transition-colors
+              ${
+                selected
+                  ? 'bg-white text-purple-600 border-b-2 border-purple-600'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }`
+            }
+          >
+            <BoltIcon className="w-4 h-4" />
+            <span>Logic</span>
+          </Tab>
         </Tab.List>
 
-        {/* Tab Panels - flex-1 with min-h-0 to allow proper shrinking in flex container */}
-        <Tab.Panels className="flex-1 min-h-0 flex flex-col">
-          <Tab.Panel className="flex-1 min-h-0 flex flex-col">
+        {/* Tab Panels - flex-1 with overflow for proper height */}
+        <Tab.Panels className="flex-1 min-h-0 overflow-hidden">
+          <Tab.Panel className="h-full overflow-hidden">
             <PreviewPanel />
           </Tab.Panel>
-          <Tab.Panel className="flex-1 min-h-0 flex flex-col">
+          <Tab.Panel className="h-full overflow-hidden">
             <CodePanel />
           </Tab.Panel>
-          <Tab.Panel className="flex-1 min-h-0 flex flex-col">
+          <Tab.Panel className="h-full overflow-hidden">
             <ConsolePanel />
+          </Tab.Panel>
+          <Tab.Panel className="h-full overflow-hidden">
+            <LogicPanel />
           </Tab.Panel>
         </Tab.Panels>
       </Tab.Group>
