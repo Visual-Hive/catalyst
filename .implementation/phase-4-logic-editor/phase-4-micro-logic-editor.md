@@ -46,6 +46,22 @@ See **[LOGIC_PATTERNS.md](../docs/LOGIC_PATTERNS.md)** for complete explanation 
 
 ---
 
+---
+
+> ⚠️ **MVP Implementation Notes**
+>
+> Phase 4 uses simplified implementations that will be improved in Level 2:
+>
+> **DOM Queries for Component Access**  
+> The `Get Component Property` node currently uses `document.getElementById()` to read component values. This works but breaks React's mental model. Level 2 will implement proper React patterns using refs or a component registry.
+>
+> **Binary Field Reserved**  
+> Every node outputs `{ json: {...}, binary: null }`. The `binary` field is reserved for future file/image handling (Level 3) and is always `null` in Phase 4 and Level 2.
+>
+> These shortcuts are intentional trade-offs to ship a working MVP faster. The architecture supports upgrading these implementations without breaking user flows.
+
+---
+
 ## 📋 Scope Definition
 
 ### ✅ In Scope (Phase 4)
@@ -62,6 +78,8 @@ See **[LOGIC_PATTERNS.md](../docs/LOGIC_PATTERNS.md)** for complete explanation 
 
 **Canvas:**
 - ✅ React Flow visual editor
+- ✅ Signal-based execution (run → done → failed)
+- ✅ JSON output references `$('NodeName').json.property`
 - ✅ Drag-and-drop node placement
 - ✅ Wire nodes together
 - ✅ Auto-save to manifest
@@ -447,36 +465,79 @@ These limitations are **temporary** and will be lifted in Level 2.
 
 ## 🔮 Future Enhancements (Level 2)
 
-After Phase 4 is complete and validated, Level 2 will add:
+After Phase 4 is complete and validated, Level 2 will add significant capabilities organized into these categories:
 
-1. **Reusable Workflows**
-   - Named workflows with inputs/outputs
-   - Call Workflow node
-   - Workflow scoping (app/page/component)
-   - See [LOGIC_PATTERNS.md](../docs/LOGIC_PATTERNS.md)
+### Variable System
 
-2. **More Events**
-   - onChange, onEnter, onBlur, etc.
-   - Page load triggers
-   - Timer triggers
+| Feature | Description |
+|---------|-------------|
+| **Execution Scope** | `$exec.var` - Flow-scoped scratch space, auto garbage collected |
+| **App Scope** | `$app.var` - Session-persistent state (cart, auth, preferences) |
+| **Reactive Updates** | Automatic component re-renders when `$page` or `$app` values change |
 
-3. **More Nodes**
-   - If/Else conditionals
-   - HTTP Request (API calls)
-   - Loop/Map
-   - Navigate
-   - Show Toast
+See [VARIABLE_SCOPES.md](../docs/VARIABLE_SCOPES.md) for complete documentation.
 
-4. **Expression System**
-   - Template expressions `{{ state.value }}`
-   - Computed properties
-   - Global functions
+### Control Flow Nodes
 
-5. **Debugging Tools**
-   - Execution traces
-   - Breakpoints
-   - State inspector
-   - Step-through debugging
+| Node | Purpose |
+|------|---------|
+| **Loop** | Iterate arrays with `$loop.item`, `$loop.index`, and `$loop.data` accumulator |
+| **Merge** | Wait for parallel branches, combine outputs (waitAll/waitAny modes) |
+| **If/Else** | Conditional branching with true/false signal outputs |
+| **Switch** | Multi-way branching based on value matching |
+
+### Event System
+
+| Node | Purpose |
+|------|---------|
+| **Emit Event** | Broadcast named event with payload (page or app scope) |
+| **On Event** | Trigger flow when event is emitted (decoupled communication) |
+
+Use events for triggering actions across decoupled components. Use reactive state (`$page`/`$app`) for automatic UI updates.
+
+### Error Handling
+
+| Feature | Description |
+|---------|-------------|
+| **Try/Catch Container** | Wrap nodes in error-handling context with catch branch |
+| **Error Context** | `$error.message`, `$error.node`, `$error.nodeType` available in catch |
+
+### Component Interaction
+
+| Node | Purpose |
+|------|---------|
+| **Component Action** | Invoke methods: focus, blur, reset, scrollIntoView, play, pause |
+| **Enhanced Get Property** | Proper React patterns (refs/registry instead of DOM queries) |
+
+### Workflow System
+
+| Feature | Description |
+|---------|-------------|
+| **Reusable Workflows** | Named workflows with defined inputs/outputs |
+| **Call Workflow** | Invoke workflow, receive done/failed signals and JSON output |
+| **Workflow Scoping** | Component, Page, or App level visibility |
+| **Extract to Workflow** | Refactor Quick Logic into reusable workflow |
+
+### Additional Event Triggers
+
+- onChange, onBlur, onFocus, onEnter
+- Page Load / Page Unload
+- Timer triggers (delayed, recurring)
+- Custom event listeners
+
+### Expression System
+
+- Template expressions `{{ state.value }}`
+- Computed properties
+- Global functions
+- Expression sandbox (security)
+
+### Debugging Tools
+
+- Execution traces (which nodes ran, timing, values)
+- State inspector (current values, change history)
+- Breakpoints
+- Step-through debugging
 
 ---
 

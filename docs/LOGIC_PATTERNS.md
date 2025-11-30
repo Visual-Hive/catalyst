@@ -263,6 +263,8 @@ export function SubmitButton() {
 - ✅ Alert node (browser alert dialog)
 - ✅ Console node (console.log)
 - ✅ Visual React Flow canvas for building logic
+- ✅ Signal-based execution (run → done → failed)
+- ✅ JSON output references `$('NodeName').json.property`
 - ✅ Live preview with HMR updates
 
 **What's NOT included (coming in Level 2):**
@@ -804,6 +806,608 @@ Plus all the Quick Logic nodes, plus:
 
 Called from 5 different places ✓
 ```
+
+---
+
+## Variable Scopes in Rise
+
+*Add this section after "Architecture Overview"*
+
+Rise provides three variable scopes with distinct lifetimes. Choosing the right scope is crucial for clean architecture.
+
+### Quick Reference
+
+| Scope | Syntax | Lifetime | Reactive? | Use Case |
+|-------|--------|----------|-----------|----------|
+| **Execution** | `$exec.var` | Single flow run | No | Temp calculations, loop accumulators |
+| **Page** | `$page.var` | Page mount | Yes | Form data, UI toggles |
+| **App** | `$app.var` | Browser session | Yes | Auth, cart, preferences |
+
+### Decision Guide
+
+```
+Need data after flow ends?
+  │
+  ├─ NO → $exec (execution scope)
+  │
+  └─ YES → Need data after navigation?
+             │
+             ├─ NO → $page (page scope)
+             │
+             └─ YES → $app (app scope)
+```
+
+### Example: Form with Cart
+
+```
+// Form field changes (page-scoped, reactive)
+[Input onChange] ─→ [SetState: $page.form.email = $event.value]
+
+// Validation during submit (execution-scoped, temporary)
+[Submit] ─→ [Validate] ─→ [Set $exec.errors = [...]]
+         ─→ [If $exec.errors.length > 0]
+               ├─→ [SetState: $page.validationErrors = $exec.errors]
+               └─→ [Add to Cart]
+
+// Cart update (app-scoped, persists across pages)
+[Add to Cart] ─→ [SetState: $app.cart.items = [...]]
+              ─→ [Emit Event: cart:updated]
+```
+
+See **[VARIABLE_SCOPES.md](./VARIABLE_SCOPES.md)** for comprehensive documentation.
+
+---
+
+## Looping Patterns
+
+*Add this as a new major section*
+
+The Loop node processes arrays item by item, with powerful data accumulation capabilities.
+
+### Basic Loop Structure
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Loop                                                             │
+│ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+│ input: $('getItems').json.items                                  │
+│                                                                  │
+│ ┌────────────────────────────────────────────────────────────┐  │
+│ │ LOOP BODY                                                  │  │
+│ │                                                            │  │
+│ │ Context available:                                         │  │
+│ │   $loop.item   → Current item                              │  │
+│ │   $loop.index  → 0, 1, 2, ...                              │  │
+│ │   $loop.isFirst, $loop.isLast                              │  │
+│ │   $loop.data   → Accumulated from previous iterations      │  │
+│ │                                                            │  │
+│ │ [Process Item] ─→ [Append to Loop Data]                    │  │
+│ │                                                            │  │
+│ └────────────────────────────────────────────────────────────┘  │
+│                                                                  │
+│ Output after all iterations:                                     │
+│   json: {                                                        │
+│     results: [...],   // Each iteration's output                 │
+│     loopData: {...},  // Accumulated data                        │
+│     count: N          // Number of iterations                    │
+│   }                                                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Pattern 1: Simple Transformation
+
+Process each item without accumulation:
+
+```
+Input: [{ name: "A", price: 10 }, { name: "B", price: 20 }]
+
+[Loop: items]
+    └─→ [Transform: { 
+           ...item, 
+           priceWithTax: $loop.item.price * 1.1 
+         }]
+
+Output.results: [
+  { name: "A", price: 10, priceWithTax: 11 },
+  { name: "B", price: 20, priceWithTax: 22 }
+]
+```
+
+### Pattern 2: Running Total (Loop Data Accumulator)
+
+Build up results across iterations:
+
+```
+Input: [{ price: 10 }, { price: 20 }, { price: 15 }]
+
+[Loop: cartItems]
+    │
+    │  Iteration 1:
+    │    $loop.item = { price: 10 }
+    │    $loop.data = { runningTotal: 0 } (initial)
+    │    └─→ [Append: { runningTotal: 0 + 10 }]
+    │
+    │  Iteration 2:
+    │    $loop.item = { price: 20 }
+    │    $loop.data = { runningTotal: 10 }
+    │    └─→ [Append: { runningTotal: 10 + 20 }]
+    │
+    │  Iteration 3:
+    │    $loop.item = { price: 15 }
+    │    $loop.data = { runningTotal: 30 }
+    │    └─→ [Append: { runningTotal: 30 + 15 }]
+
+Output.loopData: { runningTotal: 45 }
+```
+
+### Pattern 3: Conditional Processing (Break/Continue)
+
+```
+[Loop: searchResults]
+    │
+    └─→ [If: $loop.item.isMatch]
+          │
+          ├─(true)─→ [Process Match] ─→ [Break Loop]
+          │                              (stop searching, found it)
+          │
+          └─(false)─→ [Continue]
+                      (skip to next item)
+```
+
+### Pattern 4: LLM Retry with Context
+
+The loop data accumulator is perfect for AI interactions that need to learn from failures:
+
+```
+Input: [1, 2, 3]  // Retry attempts
+
+[Loop: attempts]
+    │
+    │  $loop.data starts as: { attempts: [], lastError: null }
+    │
+    └─→ [Call LLM]
+          │ System prompt includes:
+          │ "Previous attempts: {{$loop.data.attempts}}"
+          │ "Last error: {{$loop.data.lastError}}"
+          │
+          ├─(done)─→ [Break Loop with success]
+          │          Output: { result: llmResponse }
+          │
+          └─(failed)─→ [Append to Loop Data: {
+                         attempts: [...$loop.data.attempts, {
+                           attempt: $loop.index + 1,
+                           error: $error.message,
+                           response: $('llm').json.partialResponse
+                         }],
+                         lastError: $error.message
+                       }]
+                       (Continue to retry)
+```
+
+### Pattern 5: Building an Array
+
+```
+[Loop: users]
+    │
+    └─→ [HTTP: GET /users/{{$loop.item.id}}/details]
+        └─→ [Append to Loop Data: {
+               enrichedUsers: [
+                 ...$loop.data.enrichedUsers,
+                 { ...$loop.item, details: $('http').json }
+               ]
+             }]
+
+Output.loopData.enrichedUsers: [
+  { id: 1, name: "Alice", details: {...} },
+  { id: 2, name: "Bob", details: {...} }
+]
+```
+
+---
+
+## Parallel Execution and Merging
+
+*Add this as a new major section*
+
+When operations can run simultaneously, parallel branches improve performance and simplify flows.
+
+### Creating Parallel Branches
+
+Wire multiple nodes from a single output signal:
+
+```
+                    ┌─→ [HTTP: /api/user]──────────→┐
+[Button Click] ─→ ──┼─→ [HTTP: /api/preferences]───→┼─→ [Merge] ─→ [Combine Data]
+                    └─→ [HTTP: /api/notifications]─→┘
+```
+
+All three HTTP requests fire simultaneously. Merge waits for all to complete.
+
+### Merge Node Modes
+
+**Wait All (default):** Wait for every branch to complete
+
+```
+[Merge: waitAll]
+    ◀ run (from Branch A)
+    ◀ run (from Branch B)
+    ◀ run (from Branch C)
+    
+    Waits until all 3 arrive, then:
+    ▶ done
+    
+    Output: {
+      results: [branchA_output, branchB_output, branchC_output]
+    }
+```
+
+**Wait Any:** Fire as soon as any branch completes (race condition)
+
+```
+[Merge: waitAny]
+    ◀ run (from CDN 1)
+    ◀ run (from CDN 2)
+    ◀ run (from CDN 3)
+    
+    First response wins:
+    ▶ done (immediately when first arrives)
+    
+    Output: {
+      result: firstResponse,
+      winner: "branchIndex"
+    }
+```
+
+### Combining Results
+
+**Append mode:** Array of results (order matches branch order)
+```
+results: [
+  { user: {...} },
+  { preferences: {...} },
+  { notifications: [...] }
+]
+```
+
+**Merge mode:** Shallow object merge
+```
+combined: {
+  user: {...},
+  preferences: {...},
+  notifications: [...]
+}
+```
+
+### Pattern: Dashboard Data Loading
+
+```
+[Page Load]
+    │
+    ├─→ [HTTP: /api/stats]──────────→┐
+    │                                 │
+    ├─→ [HTTP: /api/recent-activity]─→┼─→ [Merge: waitAll, combine: merge]
+    │                                 │        │
+    └─→ [HTTP: /api/notifications]───→┘        │
+                                               ▼
+                                    [SetState: $page.dashboard = merged]
+```
+
+### Pattern: Fastest Mirror
+
+```
+[Download Request]
+    │
+    ├─→ [HTTP: mirror1.example.com/file]─→┐
+    │                                      │
+    ├─→ [HTTP: mirror2.example.com/file]──→┼─→ [Merge: waitAny]
+    │                                      │        │
+    └─→ [HTTP: mirror3.example.com/file]──→┘        │
+                                                    ▼
+                                         [Use fastest response]
+```
+
+### Error Handling in Parallel
+
+If ANY branch fails, the Merge node fires `failed` signal:
+
+```
+[Merge]
+    ├─▶ done (all succeeded)
+    └─▶ failed (any failed)
+           │
+           └─→ $error contains: {
+                 failedBranches: ["branchB"],
+                 successfulResults: [branchA_output, branchC_output],
+                 errors: [{ branch: "branchB", message: "..." }]
+               }
+```
+
+---
+
+## Event-Driven Architecture
+
+*Add this as a new major section*
+
+Rise provides two complementary mechanisms for component communication:
+
+1. **Reactive State** - Automatic updates when `$page` or `$app` variables change
+2. **Event Bus** - Explicit pub/sub for triggering actions
+
+### When to Use Each
+
+| Use Reactive State When | Use Event Bus When |
+|------------------------|-------------------|
+| Data should reflect in UI automatically | You need to trigger side-effect actions |
+| Multiple components show same data | Communication should be decoupled |
+| Simple state updates | Event payload is temporary (not persisted) |
+| "What is the current value?" | "Something just happened!" |
+
+### Reactive State Pattern (Automatic)
+
+Components automatically update when referenced state changes:
+
+```
+// Component A: Updates cart
+[Add to Cart] ─→ [SetState: $app.cart.items = [...]]
+
+// Component B: Displays count (no wiring needed!)
+<CartBadge>
+  {{ $app.cart.items.length }}
+</CartBadge>
+
+// Component C: Shows cart contents (also automatic!)
+<CartDrawer>
+  <For each={$app.cart.items}>
+    ...
+  </For>
+</CartDrawer>
+```
+
+**Magic:** When the flow updates `$app.cart.items`, both CartBadge and CartDrawer re-render automatically. No explicit connections required.
+
+### Event Bus Pattern (Explicit)
+
+When you need to trigger actions, not just update data:
+
+```
+// Component A: Emits event after action
+[Add to Cart] 
+    ─→ [SetState: $app.cart.items = [...]]
+    ─→ [Emit Event: "cart:itemAdded", payload: { item, newTotal }]
+
+// Component B: Listens and shows toast (action, not display)
+[On Event: "cart:itemAdded"]
+    ─→ [Show Toast: "{{$event.payload.item.name}} added!"]
+
+// Component C: Listens and animates
+[On Event: "cart:itemAdded"]
+    ─→ [Component Action: cartIcon.playBounceAnimation]
+
+// Component D: Listens and logs analytics
+[On Event: "cart:itemAdded"]
+    ─→ [HTTP: POST /analytics/cart-add, body: $event.payload]
+```
+
+### Combined Pattern
+
+Use both together for robust architecture:
+
+```
+[Add to Cart]
+    │
+    ├─→ [SetState: $app.cart.items = [...]]     // Reactive: UI updates
+    │
+    └─→ [Emit: cart:itemAdded]                   // Events: Trigger actions
+          │
+          ├─→ [Toast: "Added!"]                  // Action
+          ├─→ [Analytics: track]                 // Action  
+          └─→ [Animation: bounce]                // Action
+```
+
+### Event Naming Conventions
+
+Use namespaced event names for clarity:
+
+```
+// Good
+cart:itemAdded
+cart:itemRemoved
+cart:cleared
+auth:loggedIn
+auth:loggedOut
+form:submitted
+form:validationFailed
+
+// Avoid
+itemAdded        // Which item? Where?
+update           // Too vague
+click            // Use component events for this
+```
+
+### Event Scope
+
+**Page scope:** Event only reaches listeners on current page
+```
+[Emit Event: "form:step2Complete", scope: page]
+```
+
+**App scope:** Event reaches listeners anywhere in app
+```
+[Emit Event: "auth:sessionExpired", scope: app]
+```
+
+---
+
+## Error Handling Patterns
+
+*Add this as a new major section*
+
+Rise provides multiple strategies for handling errors gracefully.
+
+### Strategy 1: Per-Node Failed Signals
+
+Every node has a `failed` signal output for inline error handling:
+
+```
+[HTTP Request]
+    │
+    ├─(done)─→ [Process Response]
+    │
+    └─(failed)─→ [Show Error Toast: $error.message]
+```
+
+**Best for:** Simple flows, individual node errors
+
+### Strategy 2: Try/Catch Containers
+
+Wrap multiple nodes in error-handling context:
+
+```
+┌─ Try/Catch ─────────────────────────────────────────────────┐
+│                                                              │
+│  TRY:                                                        │
+│  [Validate] ─→ [Transform] ─→ [HTTP POST] ─→ [Update UI]     │
+│                                                              │
+│  CATCH:                                                      │
+│  [Log: $error.message] ─→ [SetState: $page.error = $error]   │
+│                                                              │
+│  Available in catch:                                         │
+│    $error.message - Error description                        │
+│    $error.node    - Which node failed                        │
+│    $error.nodeType - Type of failed node                     │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Best for:** Complex flows, consistent error handling
+
+### Strategy 3: Execution Variables for Error Collection
+
+Collect errors without stopping the flow:
+
+```
+[Initialize: $exec.errors = []]
+    │
+    ├─→ [Validate Email]
+    │     └─(failed)─→ [Append: $exec.errors.push({field: "email", ...})]
+    │
+    ├─→ [Validate Password]  
+    │     └─(failed)─→ [Append: $exec.errors.push({field: "password", ...})]
+    │
+    └─→ [Check: $exec.errors.length]
+          │
+          ├─(> 0)─→ [SetState: $page.errors = $exec.errors]
+          │
+          └─(= 0)─→ [Submit Form]
+```
+
+**Best for:** Validation, collecting multiple errors
+
+### Pattern: Graceful Degradation
+
+```
+[Load User Data]
+    │
+    ├─→ [HTTP: /api/user/full] ────────────────────→┐
+    │     │                                          │
+    │     └─(failed)─→ [HTTP: /api/user/basic]──────→┼─→ [Display Data]
+    │                    │                           │
+    │                    └─(failed)─→ [Use Cached]──→┘
+    │                                   │
+    │                                   └─(failed)─→ [Show Offline Message]
+```
+
+### Pattern: Retry with Backoff
+
+```
+[HTTP Request]
+    │
+    └─(failed)─→ [Wait: 1000ms] ─→ [Retry]
+                                      │
+                                      └─(failed)─→ [Wait: 2000ms] ─→ [Retry]
+                                                                        │
+                                                                        └─(failed)─→ [Give Up]
+```
+
+**Better approach with Loop:**
+
+```
+Input: [{ delay: 1000 }, { delay: 2000 }, { delay: 4000 }]
+
+[Loop: retryAttempts]
+    │
+    └─→ [Wait: $loop.item.delay]
+        └─→ [HTTP Request]
+              │
+              ├─(done)─→ [Break Loop] ─→ [Success]
+              │
+              └─(failed)─→ [Append error to $loop.data]
+                           └─→ [Continue to next attempt]
+
+After loop (if no break):
+    └─→ [All retries failed: $loop.data.errors]
+```
+
+---
+
+## Updated Summary Table
+
+*Replace the existing summary table*
+
+| Feature | Quick Logic (Phase 4) | Level 2 |
+|---------|----------------------|---------|
+| **Triggers** | onClick only | All events + custom events |
+| **Nodes** | 4 (Get, Set, Alert, Console) | 20+ nodes |
+| **Variable Scopes** | Page only | Execution + Page + App |
+| **Workflows** | ❌ | ✅ Reusable with inputs/outputs |
+| **Looping** | ❌ | ✅ With data accumulator |
+| **Parallel Execution** | ❌ | ✅ With merge |
+| **Event Bus** | ❌ | ✅ Emit/OnEvent |
+| **Error Handling** | Basic failed signals | Try/Catch containers |
+| **Component Actions** | ❌ | ✅ Focus, blur, reset, etc. |
+
+---
+
+## Next Steps
+
+*Update the existing "Next Steps" section*
+
+### For Phase 4 (Current)
+1. ✅ Implement Quick Logic pattern
+2. ✅ Create 4 node types (Get Component Property, SetState, Alert, Console)
+3. ✅ Build React Flow canvas UI
+4. ✅ Integrate with manifest store
+5. ✅ Test with simple interactions
+
+### For Level 2 (Future)
+1. **Variable System**
+   - Execution scope (`$exec`)
+   - App scope (`$app`)
+   - Reactive updates
+
+2. **Control Flow**
+   - Loop node with `$loop.data` accumulator
+   - Merge node for parallel branches
+   - If/Else, Switch nodes
+
+3. **Event System**
+   - Emit Event node
+   - On Event trigger
+   - Page and App scope events
+
+4. **Error Handling**
+   - Try/Catch container
+   - Error context (`$error`)
+
+5. **Component Interaction**
+   - Component Action node (focus, blur, reset, etc.)
+   - Enhanced Get Component Property
+
+6. **Workflows**
+   - Named reusable workflows
+   - Call Workflow node
+   - Workflow inputs/outputs
+   - Extract to Workflow refactoring
 
 ---
 

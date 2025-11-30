@@ -811,6 +811,67 @@ Ran `npx tsc --noEmit -p tsconfig.renderer.json` - all new files compile success
 
 ---
 
+## Implementation Notes
+
+### Get Component Property - DOM Query Approach
+
+**Current (MVP) Implementation:**
+```typescript
+// Uses DOM query - works but not ideal
+const value = document.getElementById(componentId)?.value || '';
+```
+
+**Why this approach for MVP:**
+- Simple to implement
+- Works reliably for basic form inputs
+- No additional architecture needed
+
+**Limitations:**
+- Breaks React's unidirectional data flow
+- Doesn't work for components without DOM IDs
+- Can't access React state directly
+
+**Level 2 Improvement Path:**
+```typescript
+// Option A: Component Registry
+const registry = useComponentRegistry();
+const value = registry.get(componentId).currentValue;
+
+// Option B: Ref forwarding
+const ref = useComponentRef(componentId);
+const value = ref.current?.value;
+
+// Option C: Zustand selector
+const value = usePageStore(state => state.components[componentId].value);
+```
+
+The manifest schema and node interface remain the same - only the runtime implementation changes.
+
+### Binary Output Field
+
+**Current:** Always `null`
+```typescript
+output: {
+  json: { value: "user@email.com" },
+  binary: null  // Reserved for Level 3
+}
+```
+
+**Future (Level 3):** Will support file/image data
+```typescript
+output: {
+  json: { filename: "photo.jpg", size: 1024 },
+  binary: {
+    type: "image/jpeg",
+    data: ArrayBuffer | Blob | base64string
+  }
+}
+```
+
+For MVP, always set `binary: null` and don't expose it in the UI. It's part of the schema for forward compatibility.
+
+---
+
 **Task Status:** 🟢 Completed  
 **Final Confidence:** 9/10  
 **Last Updated:** 2025-11-29
