@@ -169,7 +169,7 @@ function generateUseStateHook(name: string, variable: StateVariable): string {
   // Generate setter name (camelCase with 'set' prefix)
   const setterName = `set${capitalize(name)}`;
   
-  return `const [${name}, ${setterName}] = useState<${tsType}>(${initialValue});`;
+  return `const [${name}, ${setterName}] = useState(${initialValue});`;
 }
 
 /**

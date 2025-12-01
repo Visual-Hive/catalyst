@@ -1,0 +1,260 @@
+/**
+ * @file prism-custom.css
+ * @description Custom Prism.js theme for Rise Code Panel
+ * 
+ * @architecture Phase 3, Task 3.9 - Code Panel Syntax Highlighting
+ * @created 2025-12-01
+ * 
+ * Based on Prism Tomorrow theme with Rise color adjustments.
+ * Uses Tailwind color palette for consistency with the rest of the UI.
+ * 
+ * Token Categories:
+ * - Comments: Gray, italic
+ * - Strings: Green
+ * - Keywords: Purple, bold
+ * - Functions/Classes: Blue, bold
+ * - Numbers/Constants: Amber
+ * - Operators: Blue
+ * - Tags (JSX): Blue for components, Orange for HTML
+ * - Attributes: Cyan
+ */
+
+/* ============================================================================
+   BASE CODE STYLING
+   ============================================================================ */
+
+/* Code line container */
+.prism-code-line {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+/* ============================================================================
+   TOKEN STYLING - Comments
+   ============================================================================ */
+
+/* Comments - Gray 500, italic */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #6b7280; /* gray-500 */
+  font-style: italic;
+}
+
+/* ============================================================================
+   TOKEN STYLING - Punctuation & Operators
+   ============================================================================ */
+
+/* Punctuation - Gray 600 */
+.token.punctuation {
+  color: #4b5563; /* gray-600 */
+}
+
+/* Operators - Blue 500 */
+.token.operator {
+  color: #3b82f6; /* blue-500 */
+}
+
+/* Entity and URL operators */
+.token.entity,
+.token.url,
+.language-css .token.string,
+.style .token.string {
+  color: #3b82f6; /* blue-500 */
+}
+
+/* ============================================================================
+   TOKEN STYLING - Keywords & Control Flow
+   ============================================================================ */
+
+/* Keywords - Purple 600, medium weight */
+.token.keyword,
+.token.atrule,
+.token.attr-value {
+  color: #7c3aed; /* purple-600 */
+  font-weight: 500;
+}
+
+/* ============================================================================
+   TOKEN STYLING - Strings & Literals
+   ============================================================================ */
+
+/* Strings - Green 600 */
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+  color: #059669; /* green-600 */
+}
+
+/* Template string punctuation */
+.token.template-string .token.interpolation-punctuation {
+  color: #7c3aed; /* purple-600 */
+}
+
+/* ============================================================================
+   TOKEN STYLING - Numbers & Constants
+   ============================================================================ */
+
+/* Numbers, booleans, constants - Amber 600 */
+.token.number,
+.token.boolean,
+.token.constant,
+.token.symbol,
+.token.deleted {
+  color: #d97706; /* amber-600 */
+}
+
+/* ============================================================================
+   TOKEN STYLING - Functions & Classes
+   ============================================================================ */
+
+/* Functions - Blue 600, medium weight */
+.token.function {
+  color: #2563eb; /* blue-600 */
+  font-weight: 500;
+}
+
+/* Class names - Blue 700, medium weight */
+.token.class-name {
+  color: #1d4ed8; /* blue-700 */
+  font-weight: 500;
+}
+
+/* ============================================================================
+   TOKEN STYLING - JSX/HTML Tags
+   ============================================================================ */
+
+/* Generic tags */
+.token.tag {
+  color: #ea580c; /* orange-600 */
+}
+
+/* Tag punctuation (< >) */
+.token.tag .token.punctuation {
+  color: #9ca3af; /* gray-400 */
+}
+
+/* Component tags (PascalCase) - Blue 600 */
+.token.tag .token.class-name {
+  color: #2563eb; /* blue-600 */
+  font-weight: 500;
+}
+
+/* ============================================================================
+   TOKEN STYLING - Attributes
+   ============================================================================ */
+
+/* Attribute names - Cyan 600 */
+.token.attr-name {
+  color: #0891b2; /* cyan-600 */
+}
+
+/* Attribute values - Green 600 (same as strings) */
+.token.attr-value {
+  color: #059669; /* green-600 */
+}
+
+/* Selector (CSS) */
+.token.selector {
+  color: #0891b2; /* cyan-600 */
+}
+
+/* Property names (CSS) */
+.token.property {
+  color: #0891b2; /* cyan-600 */
+}
+
+/* ============================================================================
+   TOKEN STYLING - Regex & Variables
+   ============================================================================ */
+
+/* Regex - Red 500 */
+.token.regex {
+  color: #ef4444; /* red-500 */
+}
+
+/* Important - Red 500, bold */
+.token.important {
+  color: #ef4444; /* red-500 */
+  font-weight: bold;
+}
+
+/* Variables */
+.token.variable {
+  color: #ea580c; /* orange-600 */
+}
+
+/* ============================================================================
+   TOKEN STYLING - Font Styles
+   ============================================================================ */
+
+.token.bold {
+  font-weight: bold;
+}
+
+.token.italic {
+  font-style: italic;
+}
+
+/* ============================================================================
+   SPECIAL STYLING - JSX Specific
+   ============================================================================ */
+
+/* JSX text content */
+.language-jsx .token.plain-text {
+  color: #374151; /* gray-700 */
+}
+
+/* JSX script block */
+.token.script {
+  color: #374151; /* gray-700 */
+}
+
+/* JSX spread operator */
+.token.spread {
+  color: #7c3aed; /* purple-600 */
+}
+
+/* ============================================================================
+   SPECIAL STYLING - TypeScript Specific
+   ============================================================================ */
+
+/* Type annotations */
+.language-typescript .token.builtin,
+.language-tsx .token.builtin {
+  color: #0891b2; /* cyan-600 */
+}
+
+/* Generic type parameters */
+.token.generic-function .token.punctuation {
+  color: #4b5563; /* gray-600 */
+}
+
+/* ============================================================================
+   HOVER STATES (Optional enhancement for future)
+   ============================================================================ */
+
+/* 
+.token:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-radius: 2px;
+}
+*/
+
+/* ============================================================================
+   DARK MODE SUPPORT (Future enhancement)
+   ============================================================================ */
+
+/*
+@media (prefers-color-scheme: dark) {
+  .token.comment { color: #9ca3af; }
+  .token.keyword { color: #a78bfa; }
+  .token.string { color: #34d399; }
+  .token.number { color: #fbbf24; }
+  .token.function { color: #60a5fa; }
+}
+*/

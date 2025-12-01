@@ -49,6 +49,7 @@ import { EventEmitter } from 'events';
 import type { Manifest, Component } from '../manifest/types';
 import type { FileChangeTracker } from '../FileChangeTracker';
 import { ReactCodeGenerator } from '../codegen/ReactCodeGenerator';
+import { FlowCodeGenerator } from '../codegen/FlowCodeGenerator';
 import { ChangeDetector } from './ChangeDetector';
 import { FileWriter } from './FileWriter';
 import { AppGenerator, type RootComponentInfo } from './AppGenerator';
@@ -437,13 +438,20 @@ export class FileManager extends EventEmitter implements IFileManager {
   async generateIncremental(manifest: Manifest): Promise<GenerationSummary> {
     const startTime = performance.now();
 
-    // Step 1: Detect changes
+    // Step 1: Detect changes in components
     const changes = this.changeDetector.detectChanges(manifest.components);
+    
+    // Step 1b: Check if there's logic data that needs App.jsx regeneration
+    // IMPORTANT: Logic (flows, pageState) changes require App.jsx regeneration
+    // even if no components changed (e.g., user edited a flow node's message)
+    // Task 4.6 fix: Always regenerate App.jsx when there's logic data
+    const logicContext = this.buildLogicContext(manifest);
+    const hasLogic = !!logicContext;
 
-    // If no changes, skip generation
-    if (!changes.hasChanges) {
+    // If no component changes AND no logic data, skip generation entirely
+    if (!changes.hasChanges && !hasLogic) {
       if (this.options.debug) {
-        console.log('[FileManager] generateIncremental: No changes detected, skipping');
+        console.log('[FileManager] generateIncremental: No changes detected and no logic, skipping');
       }
       return {
         ...SKIPPED_GENERATION_SUMMARY,
@@ -536,8 +544,8 @@ export class FileManager extends EventEmitter implements IFileManager {
 
       // Step 5: Regenerate App.jsx if root components changed OR if we have logic data
       // Logic data (pageState, flows) needs to be regenerated in App.jsx
-      const logicContext = this.buildLogicContext(manifest);
-      const needsAppRegeneration = changes.appNeedsUpdate || !!logicContext;
+      // Note: logicContext was already computed at the start of generateIncremental
+      const needsAppRegeneration = changes.appNeedsUpdate || hasLogic;
       
       if (needsAppRegeneration) {
         const rootComponents = this.findRootComponents(manifest);
@@ -769,6 +777,9 @@ export class FileManager extends EventEmitter implements IFileManager {
     // Root components are those NOT in childIds
     const roots: RootComponentInfo[] = [];
     
+    // Create a FlowCodeGenerator instance for consistent handler naming
+    const flowCodeGen = new FlowCodeGenerator();
+    
     for (const component of Object.values(manifest.components)) {
       if (!childIds.has(component.id)) {
         const info: RootComponentInfo = {
@@ -776,18 +787,19 @@ export class FileManager extends EventEmitter implements IFileManager {
           displayName: component.displayName,
         };
         
-        // Check if component has onClick event binding (Level 1.5)
-        // If so, include the handler name for App.jsx to pass as prop
-        if (component.events?.onClick?.flowId && manifest.flows) {
-          const flow = manifest.flows[component.events.onClick.flowId];
-          if (flow) {
-            // Generate handler name matching FlowCodeGenerator format
-            const pascalName = flow.name
-              .replace(/[^a-zA-Z0-9\s]/g, '')
-              .split(/\s+/)
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-              .join('') || 'Click';
-            info.onClickHandler = `handle${pascalName}`;
+        // Task 4.6 FIX: Look up onClick handler by searching flows for this component
+        // The relationship is stored in flow.trigger.componentId, NOT in component.events
+        // This is because flows are the source of truth - they define which component
+        // triggers them via their trigger property
+        if (manifest.flows) {
+          // Find any flow that targets this component's onClick event
+          const onClickFlow = Object.values(manifest.flows).find(
+            flow => flow.trigger.componentId === component.id && flow.trigger.type === 'onClick'
+          );
+          
+          if (onClickFlow) {
+            // Use FlowCodeGenerator for consistent handler naming across codebase
+            info.onClickHandler = flowCodeGen.generateHandlerName(onClickFlow);
           }
         }
         

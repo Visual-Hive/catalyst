@@ -280,6 +280,9 @@ class GenerationServiceImpl {
     
     try {
       // Call IPC to generate files
+      // NOTE: Using incremental: false to force full regeneration
+      // This ensures new fixes (like handler wiring) are applied immediately
+      // TODO: After Task 4.6 fix is deployed, can change back to true for performance
       const result = await window.electronAPI.generation.generate({
         projectPath,
         manifest,

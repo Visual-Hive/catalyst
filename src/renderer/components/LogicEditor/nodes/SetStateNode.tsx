@@ -228,7 +228,7 @@ export function SetStateNodeComponent({
       
       // Update node with new variable and reset value to default
       updateNode(activeFlowId, id, {
-        data: {
+        config: {
           ...data,
           variable: newVariable,
           value: { type: 'static', value: defaultValue },
@@ -247,7 +247,7 @@ export function SetStateNodeComponent({
       if (!activeFlowId) return;
       
       updateNode(activeFlowId, id, {
-        data: {
+        config: {
           ...data,
           value: { type: 'static', value: newValue },
         },

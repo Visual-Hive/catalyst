@@ -234,13 +234,22 @@ export class FlowCodeGenerator {
   /**
    * Generate a unique handler function name from flow
    *
+   * PUBLIC API: This method is used by both FlowCodeGenerator and FileManager
+   * to ensure consistent handler names across code generation and prop wiring.
+   *
    * Format: handle{FlowNamePascalCase}
-   * Ensures uniqueness by including component ID hash
    *
    * @param flow - Flow to generate name for
    * @returns Handler function name (e.g., "handleButtonClick")
+   *
+   * @example
+   * ```typescript
+   * const generator = new FlowCodeGenerator();
+   * const name = generator.generateHandlerName(flow);
+   * // name = "handleButtonClick"
+   * ```
    */
-  private generateHandlerName(flow: Flow): string {
+  public generateHandlerName(flow: Flow): string {
     // Convert flow name to PascalCase
     const pascalName = flow.name
       .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special chars

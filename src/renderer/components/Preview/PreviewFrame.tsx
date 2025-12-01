@@ -74,12 +74,12 @@ interface PreviewFrameProps {
  * - allow-scripts: Required for React JavaScript execution
  * - allow-same-origin: Required for HMR WebSocket connection
  * - allow-forms: Common in web apps, safe to allow
+ * - allow-modals: Required for alert() in Level 1.5 logic flows (Task 4.6)
  * 
  * NOT ALLOWED:
  * - allow-top-navigation: Prevents iframe from redirecting parent
  * - allow-popups: Prevents iframe from opening new windows
  * - allow-pointer-lock: Not needed
- * - allow-modals: Prevents alert/confirm dialogs
  * 
  * USAGE:
  * ```tsx
@@ -193,7 +193,7 @@ export function PreviewFrame({
           onLoad={handleLoad}
           onError={handleError}
           className="absolute inset-0 w-full h-full border-0 bg-white"
-          sandbox="allow-scripts allow-same-origin allow-forms"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
         />
         
         {/* Loading overlay */}
@@ -268,7 +268,7 @@ export function PreviewFrame({
                 transform: `scale(${zoom})`,
                 transformOrigin: 'top left',
               }}
-              sandbox="allow-scripts allow-same-origin allow-forms"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
             />
           </div>
           

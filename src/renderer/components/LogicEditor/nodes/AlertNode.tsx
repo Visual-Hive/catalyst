@@ -115,7 +115,7 @@ export function AlertNodeComponent({
       if (!activeFlowId) return;
       
       updateNode(activeFlowId, id, {
-        data: {
+        config: {
           ...data,
           message: { type: 'static', value: event.target.value },
         },

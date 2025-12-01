@@ -166,7 +166,7 @@ export function ConsoleNodeComponent({
       if (!activeFlowId) return;
       
       updateNode(activeFlowId, id, {
-        data: {
+        config: {
           ...data,
           level: event.target.value as ConsoleLevel,
         },
@@ -184,7 +184,7 @@ export function ConsoleNodeComponent({
       if (!activeFlowId) return;
       
       updateNode(activeFlowId, id, {
-        data: {
+        config: {
           ...data,
           message: { type: 'static', value: event.target.value },
         },

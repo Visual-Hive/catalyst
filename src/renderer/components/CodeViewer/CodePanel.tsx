@@ -2,27 +2,36 @@
  * @file CodePanel.tsx
  * @description Code viewer panel displaying generated React code for components
  * 
- * @architecture Phase 3, Task 3.1 - React Code Generator UI
+ * @architecture Phase 3, Task 3.1 + Task 3.9 - React Code Generator UI + Syntax Highlighting
  * @created 2025-11-27
+ * @updated 2025-12-01
  * @author AI (Cline) + Human Review
- * @confidence 9/10 - Straightforward code display with generation
+ * @confidence 9/10 - Proper Prism.js syntax highlighting
  * 
  * @see src/core/codegen/ReactCodeGenerator.ts - Code generation logic
  * @see src/renderer/store/manifestStore.ts - Component selection state
+ * @see src/renderer/utils/prismConfig.ts - Prism.js configuration
  * 
  * PROBLEM SOLVED:
  * - Displays generated React code for selected component
  * - Live updates when manifest or selection changes
  * - Copy to clipboard functionality
+ * - Professional syntax highlighting with Prism.js
  * 
  * SOLUTION:
  * - Uses ReactCodeGenerator to generate code on-the-fly
  * - Subscribes to manifestStore for component selection
- * - Basic syntax highlighting with CSS classes
+ * - Uses Prism.js for proper JSX tokenization (no regex hacks)
+ * - Theme customizable via CSS
  * - Responsive layout with scrolling
  * 
+ * PREVIOUS ISSUE (Fixed in Task 3.9):
+ * - Old regex-based highlighting caused overlapping HTML spans
+ * - Numbers in CSS classes (like "text-purple-600") were incorrectly highlighted
+ * - Now using Prism.js for proper tokenization
+ * 
  * @security-critical false
- * @performance-critical false - Code generation is fast
+ * @performance-critical false - Code generation and highlighting are fast
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -36,6 +45,8 @@ import { useManifestStore } from '../../store/manifestStore';
 import { useProjectStore } from '../../store/projectStore';
 import { ReactCodeGenerator } from '../../../core/codegen/ReactCodeGenerator';
 import { AppGenerator } from '../../../core/filemanager/AppGenerator';
+import { highlightCode } from '../../utils/prismConfig';
+import '../../styles/prism-custom.css';
 
 /**
  * Format for displaying generated code
@@ -295,90 +306,36 @@ export function CodePanel() {
 }
 
 /**
- * CodeLine component - Basic syntax highlighting
+ * CodeLine component - Professional syntax highlighting using Prism.js
  * 
- * Applies CSS classes for different token types:
- * - Keywords (import, export, const, function, return)
- * - Strings (quotes)
- * - Comments (// and /*)
- * - JSX tags (<Component>)
- * - Numbers
+ * Uses Prism.js tokenizer for proper JSX syntax highlighting.
+ * Replaces the previous regex-based approach that caused overlapping
+ * HTML spans (e.g., numbers in "text-purple-600" were incorrectly highlighted).
+ * 
+ * FEATURES:
+ * - Proper JSX/React tokenization
+ * - No overlapping HTML tags
+ * - Correct handling of strings containing numbers
+ * - Comments, keywords, functions all properly styled
  * 
  * @param content - Line content to highlight
+ * 
+ * @see src/renderer/utils/prismConfig.ts - Prism configuration
+ * @see src/renderer/styles/prism-custom.css - Token styling
  */
 function CodeLine({ content }: { content: string }) {
-  // Simple syntax highlighting using regex
-  // This is basic - a proper solution would use a library like Prism.js
-  
+  // Handle empty lines - render non-breaking space to maintain line height
   if (!content.trim()) {
     return <span>&nbsp;</span>;
   }
   
-  // Check for comment lines first (entire line is comment)
-  if (content.trim().startsWith('//') || content.trim().startsWith('*') || content.trim().startsWith('/*')) {
-    return <span className="text-gray-500 italic">{content}</span>;
-  }
-  
-  // Tokenize and highlight
-  const highlighted = content
-    // Keywords
-    .replace(
-      /\b(import|export|from|const|let|var|function|return|if|else|default|async|await)\b/g,
-      '<span class="text-purple-600 font-medium">$1</span>'
-    )
-    // JSX Keywords
-    .replace(
-      /\b(React|useState|useEffect|useCallback|useMemo)\b/g,
-      '<span class="text-blue-600">$1</span>'
-    )
-    // Strings (double quotes)
-    .replace(
-      /"([^"]*)"/g,
-      '<span class="text-green-600">"$1"</span>'
-    )
-    // Strings (single quotes)
-    .replace(
-      /'([^']*)'/g,
-      "<span class=\"text-green-600\">'$1'</span>"
-    )
-    // Template literals (backticks) - simplified
-    .replace(
-      /`([^`]*)`/g,
-      '<span class="text-green-600">`$1`</span>'
-    )
-    // JSX opening tags
-    .replace(
-      /(<)([A-Z][a-zA-Z0-9]*)/g,
-      '$1<span class="text-blue-700 font-medium">$2</span>'
-    )
-    // JSX closing tags
-    .replace(
-      /(<\/)([A-Z][a-zA-Z0-9]*)(>)/g,
-      '$1<span class="text-blue-700 font-medium">$2</span>$3'
-    )
-    // HTML tags
-    .replace(
-      /(<)(div|span|button|input|label|p|h[1-6]|ul|li|a|img|form)/g,
-      '$1<span class="text-orange-600">$2</span>'
-    )
-    // Closing HTML tags
-    .replace(
-      /(<\/)(div|span|button|input|label|p|h[1-6]|ul|li|a|img|form)(>)/g,
-      '$1<span class="text-orange-600">$2</span>$3'
-    )
-    // Numbers
-    .replace(
-      /\b(\d+)\b/g,
-      '<span class="text-amber-600">$1</span>'
-    )
-    // className attribute
-    .replace(
-      /(className=)/g,
-      '<span class="text-cyan-600">$1</span>'
-    );
+  // Use Prism.js for proper syntax highlighting
+  // This produces HTML with .token classes that are styled by prism-custom.css
+  const highlighted = highlightCode(content, 'jsx');
   
   return (
     <span 
+      className="prism-code-line"
       dangerouslySetInnerHTML={{ __html: highlighted }}
     />
   );

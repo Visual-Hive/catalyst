@@ -435,6 +435,7 @@ export class ChangeDetector implements IChangeDetector {
       properties: component.properties,
       styling: component.styling,
       children: component.children,
+      events: component.events,
       // Include stable metadata, exclude updatedAt
       metadata: {
         createdAt: component.metadata.createdAt,
