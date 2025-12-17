@@ -33,8 +33,8 @@ import { useState, useEffect, useCallback } from 'react';
  * Storage keys for persisting layout state
  */
 const STORAGE_KEYS = {
-  ACTIVE_TAB: 'rise-editor-active-tab',
-  PANEL_SIZES: 'rise-panel-sizes',
+  ACTIVE_TAB: 'catalyst-editor-active-tab',
+  PANEL_SIZES: 'catalyst-panel-sizes',
 } as const;
 
 /**

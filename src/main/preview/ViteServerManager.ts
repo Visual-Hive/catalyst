@@ -37,7 +37,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { createServer } from 'vite';
 import { findAvailablePort } from './PortFinder';
-import { riseConsoleInjectorPlugin } from './plugins/consoleInjectorPlugin';
+import { catalystConsoleInjectorPlugin } from './plugins/consoleInjectorPlugin';
 import {
   ViteServerState,
   ViteServerStatus,
@@ -77,7 +77,7 @@ interface TypedEventEmitter {
  * 
  * PROBLEM SOLVED:
  * Users need to preview their React projects in real-time. This requires
- * running a Vite dev server for their project, separate from Rise's own
+ * running a Vite dev server for their project, separate from Catalyst's own
  * Vite server. The manager handles all the complexity of process spawning,
  * port allocation, ready detection, and cleanup.
  * 
@@ -309,7 +309,7 @@ export class ViteServerManager extends EventEmitter implements TypedEventEmitter
    * This allows us to inject our console capture plugin while still
    * respecting the user's vite.config file.
    * 
-   * CRITICAL: Uses programmatic API so we can inject riseConsoleInjectorPlugin
+   * CRITICAL: Uses programmatic API so we can inject catalystConsoleInjectorPlugin
    * into the user's Vite server. This is the ONLY way to inject server-side
    * HTML transforms without modifying user's source files.
    * 
@@ -359,7 +359,7 @@ export class ViteServerManager extends EventEmitter implements TypedEventEmitter
         // Inject our console capture plugin FIRST
         // This ensures it runs before user's plugins
         plugins: [
-          riseConsoleInjectorPlugin(),
+          catalystConsoleInjectorPlugin(),
           // User's plugins will be loaded from their vite.config
         ],
         

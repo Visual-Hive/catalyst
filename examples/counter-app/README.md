@@ -1,6 +1,6 @@
 # Counter Application Example
 
-A simple counter application demonstrating **Rise Level 1.5** features including:
+A simple counter application demonstrating **Catalyst** features including:
 - Page state management
 - Event handlers (onClick)
 - Logic flows with multiple node types
@@ -25,11 +25,11 @@ A simple counter application demonstrating **Rise Level 1.5** features including
 1. **flow_increment** - onClick → setState(count, increment, 1) → console.log
 2. **flow_decrement** - onClick → setState(count, decrement, 1) → console.log  
 3. **flow_reset** - onClick → setState(count, set, 0) → console.log
-4. **flow_alert** - onClick → alert("Hello from Rise!")
+4. **flow_alert** - onClick → alert("Hello from Catalyst!")
 
 ## How to Use
 
-1. Open Rise application
+1. Open Catalyst application
 2. Use **File > Open Project** and select the `examples/counter-app` directory
 3. The manifest will load and you'll see the component tree
 4. Click **Generate** to create React code
@@ -41,7 +41,7 @@ A simple counter application demonstrating **Rise Level 1.5** features including
 - **+ Increment**: Count increases by 1, console logs "Counter incremented!"
 - **- Decrement**: Count decreases by 1, console logs "Counter decremented!"
 - **Reset**: Count becomes 0, console logs "Counter reset to 0"
-- **Show Alert**: Browser shows alert "Hello from Rise! The counter app is working."
+- **Show Alert**: Browser shows alert "Hello from Catalyst! The counter app is working."
 
 ## Generated Code Structure
 
@@ -78,4 +78,4 @@ src/
 
 ---
 
-This example was created to demonstrate the Rise low-code builder's capability to create interactive React applications using visual logic flows.
+This example was created to demonstrate the Catalyst workflow builder's capability to create interactive applications using visual logic flows.

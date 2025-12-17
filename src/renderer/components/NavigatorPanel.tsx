@@ -182,7 +182,7 @@ export function NavigatorPanel() {
             No Project Open
           </h3>
           <p className="text-sm text-gray-600 mb-6">
-            Create a new project or open an existing one to get started with Rise.
+            Create a new project or open an existing one to get started with Catalyst.
           </p>
 
           {/* Action Button */}

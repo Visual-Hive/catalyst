@@ -364,7 +364,7 @@
           "type": "alert",
           "position": { "x": 350, "y": 150 },
           "config": {
-            "message": "Hello from Rise! The counter app is working."
+            "message": "Hello from Catalyst! The counter app is working."
           }
         }
       ],

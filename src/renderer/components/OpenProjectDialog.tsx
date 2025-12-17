@@ -1,6 +1,6 @@
 /**
  * @file OpenProjectDialog.tsx
- * @description Dialog for opening existing Rise projects with recent projects list
+ * @description Dialog for opening existing Catalyst projects with recent projects list
  * 
  * @architecture Phase 1, Task 1.3B - Project Loading
  * @created 2025-11-19
@@ -8,7 +8,7 @@
  * @confidence 9/10 - Follows proven patterns from NewProjectDialog
  * 
  * PROBLEM SOLVED:
- * - Users need to open existing Rise projects
+ * - Users need to open existing Catalyst projects
  * - Quick access to recently opened projects
  * - Clear feedback on invalid/corrupted projects
  * 
@@ -232,7 +232,7 @@ export function OpenProjectDialog() {
             )}
           </button>
           <p className="mt-2 text-xs text-gray-500">
-            Select a folder containing a Rise project (.lowcode directory)
+            Select a folder containing a Catalyst project (.lowcode directory)
           </p>
         </div>
 

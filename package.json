@@ -1,7 +1,7 @@
 {
-  "name": "rise-low-code-builder",
+  "name": "catalyst",
   "version": "0.1.0",
-  "description": "AI-powered visual low-code builder for React applications",
+  "description": "AI-powered visual workflow builder that generates production Python code",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -24,12 +24,14 @@
     "lint:fix": "eslint src electron --ext .ts,.tsx --fix"
   },
   "keywords": [
-    "low-code",
-    "react",
+    "workflow",
+    "python",
     "visual-builder",
-    "electron"
+    "electron",
+    "automation",
+    "fastapi"
   ],
-  "author": "Rise Team",
+  "author": "Catalyst Team",
   "license": "MIT",
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -113,8 +115,8 @@
     "zustand": "^4.5.2"
   },
   "build": {
-    "appId": "com.rise.lowcode",
-    "productName": "Rise",
+    "appId": "com.catalyst.workflow",
+    "productName": "Catalyst",
     "directories": {
       "output": "release"
     },

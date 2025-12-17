@@ -66,7 +66,7 @@ export const MissingManifestDialog: React.FC = () => {
       case 'NOT_FOUND':
         return {
           title: 'Manifest Not Found',
-          description: 'This project does not have a manifest.json file in the .lowcode folder. This file is required to manage components in Rise.',
+          description: 'This project does not have a manifest.json file in the .lowcode folder. This file is required to manage workflows in Catalyst.',
         };
       
       case 'PARSE_ERROR':
@@ -261,7 +261,7 @@ export const MissingManifestDialog: React.FC = () => {
         <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
           <strong>What is a manifest?</strong> The manifest.json file stores all
           information about your components, their properties, and relationships.
-          It's the source of truth for your Rise project.
+          It's the source of truth for your Catalyst project.
         </div>
       </div>
     </Modal>

@@ -3,7 +3,7 @@
  * @description Vite plugin that injects console capture script into preview HTML
  * 
  * PROBLEM SOLVED:
- * Browser security prevents cross-origin iframe access. Rise (localhost:5173)
+ * Browser security prevents cross-origin iframe access. Catalyst (localhost:5173)
  * cannot inject scripts into preview iframe (localhost:3004) from client side.
  * This plugin solves it by injecting server-side during HTML transformation.
  * 
@@ -22,11 +22,11 @@
  * 
  * USAGE EXAMPLE:
  * ```typescript
- * import { riseConsoleInjectorPlugin } from './plugins/consoleInjectorPlugin';
+ * import { catalystConsoleInjectorPlugin } from './plugins/consoleInjectorPlugin';
  * 
  * const server = await createServer({
  *   plugins: [
- *     riseConsoleInjectorPlugin(),
+ *     catalystConsoleInjectorPlugin(),
  *     // other plugins...
  *   ],
  * });
@@ -72,7 +72,7 @@ function generateConsoleInjector(): string {
 (function() {
   'use strict';
   
-  console.log('[Rise] Console capture script loading...');
+  console.log('[Catalyst] Console capture script loading...');
   
   // Store original console methods
   const originalConsole = {
@@ -152,7 +152,7 @@ function generateConsoleInjector(): string {
     originalConsole.trace.apply(console, args);
   };
   
-  console.log('[Rise] Console capture ready');
+  console.log('[Catalyst] Console capture ready');
 })();
 `;
 }
@@ -275,20 +275,20 @@ ${scriptCode}
  * @example
  * ```typescript
  * import { createServer } from 'vite';
- * import { riseConsoleInjectorPlugin } from './plugins/consoleInjectorPlugin';
+ * import { catalystConsoleInjectorPlugin } from './plugins/consoleInjectorPlugin';
  * 
  * const server = await createServer({
  *   plugins: [
- *     riseConsoleInjectorPlugin(), // Add as first plugin
+ *     catalystConsoleInjectorPlugin(), // Add as first plugin
  *     // ... other plugins
  *   ],
  * });
  * ```
  */
-export function riseConsoleInjectorPlugin(): Plugin {
+export function catalystConsoleInjectorPlugin(): Plugin {
   return {
     // Plugin name (shows in Vite output)
-    name: 'rise-console-injector',
+    name: 'catalyst-console-injector',
     
     /**
      * Transform HTML hook
@@ -313,14 +313,14 @@ export function riseConsoleInjectorPlugin(): Plugin {
        * @returns Modified HTML with console script
        */
       handler(html: string): string {
-        console.log('[riseConsoleInjectorPlugin] Transform HTML called');
-        console.log('[riseConsoleInjectorPlugin] Original HTML length:', html.length);
+        console.log('[catalystConsoleInjectorPlugin] Transform HTML called');
+        console.log('[catalystConsoleInjectorPlugin] Original HTML length:', html.length);
         
         // Inject console capture script
         const modifiedHtml = injectConsoleScript(html);
         
-        console.log('[riseConsoleInjectorPlugin] Modified HTML length:', modifiedHtml.length);
-        console.log('[riseConsoleInjectorPlugin] Script injected:', modifiedHtml.includes('rise-console-injector'));
+        console.log('[catalystConsoleInjectorPlugin] Modified HTML length:', modifiedHtml.length);
+        console.log('[catalystConsoleInjectorPlugin] Script injected:', modifiedHtml.includes('catalyst-console-injector'));
         
         return modifiedHtml;
       },

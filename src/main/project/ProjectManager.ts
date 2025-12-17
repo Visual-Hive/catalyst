@@ -1,6 +1,6 @@
 /**
  * @file ProjectManager.ts
- * @description Core project management orchestrator for Rise
+ * @description Core project management orchestrator for Catalyst
  * 
  * CENTRAL COORDINATOR for all project operations including:
  * - Creating new projects with templates
@@ -47,7 +47,7 @@ import {
  * ProjectManager - Central orchestrator for project operations
  * 
  * PROBLEM SOLVED:
- * Users need a reliable, secure way to create and manage Rise projects.
+ * Users need a reliable, secure way to create and manage Catalyst projects.
  * This class provides:
  * - Validated project creation
  * - Secure file operations
@@ -105,9 +105,9 @@ export class ProjectManager {
     this.validator = new ProjectValidator();
     
     // Recent projects stored in app data directory
-    // macOS: ~/Library/Application Support/Rise/recent-projects.json
-    // Windows: %APPDATA%/Rise/recent-projects.json
-    // Linux: ~/.config/Rise/recent-projects.json
+    // macOS: ~/Library/Application Support/Catalyst/recent-projects.json
+    // Windows: %APPDATA%/Catalyst/recent-projects.json
+    // Linux: ~/.config/Catalyst/recent-projects.json
     const userDataPath = app.getPath('userData');
     this.recentProjectsPath = path.join(userDataPath, 'recent-projects.json');
     
@@ -158,7 +158,7 @@ export class ProjectManager {
   }
 
   /**
-   * Create a new Rise project
+   * Create a new Catalyst project
    * 
    * WORKFLOW:
    * 1. Validate project name
@@ -490,10 +490,10 @@ import './App.css'
 function App() {
   return (
     <div className="app-container">
-      <h1>Welcome to Rise</h1>
+      <h1>Welcome to Catalyst</h1>
       <p>Your project <strong>${params.name}</strong> is ready!</p>
       <p className="info">
-        Start building your application by editing components in Rise.
+        Start building your workflow by adding nodes in Catalyst.
       </p>
     </div>
   )
@@ -665,11 +665,11 @@ dist-ssr
     // Generate README.md
     const readme = `# ${params.name}
 
-A React application built with Rise - an AI-powered visual low-code builder.
+A workflow automation project built with Catalyst - an AI-powered visual workflow builder.
 
 ## Getting Started
 
-This project was created with Rise and uses Vite + React + TypeScript.
+This project was created with Catalyst and generates Python + FastAPI code.
 
 ### Development
 
@@ -691,7 +691,7 @@ npm run preview
 
 ## Project Structure
 
-- \`.lowcode/\` - Rise project configuration
+- \`.lowcode/\` - Catalyst project configuration
   - \`manifest.json\` - Component definitions
   - \`settings.json\` - Project settings
 - \`src/\` - Application source code
@@ -699,7 +699,7 @@ npm run preview
 
 ## Learn More
 
-- [Rise Documentation](https://github.com/richardosborne14/rise)
+- [Catalyst Documentation](https://github.com/Visual-Hive/catalyst)
 - [Vite Documentation](https://vitejs.dev/)
 - [React Documentation](https://react.dev/)
 `;
@@ -1000,9 +1000,9 @@ npm run preview
   }
 
   /**
-   * Load an existing Rise project
+   * Load an existing Catalyst project
    * 
-   * Opens and validates a Rise project from disk, loading its manifest
+   * Opens and validates a Catalyst project from disk, loading its manifest
    * and settings. If valid, adds to recent projects and sets as current.
    * 
    * WORKFLOW:

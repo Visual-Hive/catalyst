@@ -83,7 +83,7 @@ export class APIKeyManager {
    * Service name for keychain storage
    * Used to namespace Rise keys from other applications
    */
-  private readonly SERVICE_NAME = 'rise-low-code-builder';
+  private readonly SERVICE_NAME = 'catalyst-workflow-builder';
   
   /**
    * Default key rotation period in days

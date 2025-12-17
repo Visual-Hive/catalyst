@@ -52,7 +52,7 @@ async function createWindow(): Promise<void> {
     minWidth: 800,
     minHeight: 600,
     // Window styling
-    title: 'Rise - Visual Low-Code Builder',
+    title: 'Catalyst - Visual Workflow Builder',
     backgroundColor: '#ffffff',
     // Disable menu bar initially (we'll set custom menu)
     autoHideMenuBar: false,
@@ -207,13 +207,13 @@ function createApplicationMenu(): void {
         {
           label: 'Learn More',
           click: async () => {
-            await shell.openExternal('https://github.com/yourusername/rise');
+            await shell.openExternal('https://github.com/Visual-Hive/catalyst');
           },
         },
         {
           label: 'Documentation',
           click: async () => {
-            await shell.openExternal('https://github.com/yourusername/rise/docs');
+            await shell.openExternal('https://github.com/Visual-Hive/catalyst/docs');
           },
         },
       ],
@@ -267,7 +267,7 @@ app.whenReady().then(async () => {
     }
   });
 
-  console.log('[INFO] Rise application started successfully');
+  console.log('[INFO] Catalyst application started successfully');
 });
 
 /**

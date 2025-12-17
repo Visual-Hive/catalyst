@@ -1,4 +1,4 @@
-# Rise Low-Code Builder - Project Rules
+# Catalyst Workflow Builder - Project Rules
 
 ## Security
 
@@ -19,32 +19,40 @@ DO NOT read or modify:
 ### Core Principles
 1. Plugin-ready design
 2. Manifest as source of truth
-3. Bidirectional workflow support
-4. Clean, maintainable code output
+3. Workflow-based automation
+4. Clean, maintainable Python code output
 
 ### Plugin Interface
-- Use FrameworkPlugin interface
-- Keep React-specific in ReactPlugin
-- Design for Vue/Svelte future support
+- Use WorkflowPlugin interface
+- Keep Python-specific code in PythonPlugin
+- Design for extensibility
 - Use semantic descriptions
 
-### Expression System
-- Tier 1: Sandboxed, no side effects
-- Tier 2: Full power, explicit creation
+### Node System
+- Workflow nodes define operations
+- Connections define data flow
+- Triggers initiate workflows
+- Control flow nodes manage execution
 
 ## Code Style
 
-### TypeScript
+### TypeScript (Editor)
 - Strict mode
 - Define all interfaces
 - Avoid `any`, use `unknown`
 - Use type guards
 
-### React
+### React (Editor UI)
 - Functional components only
 - Hooks for state
 - Error boundaries
 - PropTypes for generated code
+
+### Python (Generated)
+- Python 3.11+ features
+- Type hints everywhere
+- Async/await patterns
+- FastAPI conventions
 
 ### Naming
 - Components: PascalCase
@@ -68,7 +76,7 @@ DO NOT read or modify:
 
 ### Unit Tests For:
 - Manifest validation
-- Expression parsing/sandboxing
+- Node type definitions
 - Code generation
 - Plugin interfaces
 
@@ -76,6 +84,7 @@ DO NOT read or modify:
 - Complete workflows
 - File system ops
 - IPC communication
+- Python runtime
 
 ### Manual Testing For:
 - UI/UX flows
@@ -88,7 +97,7 @@ Update when changing:
 - Relevant docs in `docs/`
 - Code comments
 - README.md
-- DOCUMENTATION_INDEX.md
+- Catalyst documentation
 
 ## Git Workflow
 
@@ -96,9 +105,9 @@ Update when changing:
 Format: `[component] description`
 
 Examples:
-- `[manifest] Add circular dependency validation`
-- `[codegen] Implement React generator`
-- `[ui] Add component tree context menu`
+- `[manifest] Add workflow validation`
+- `[codegen] Implement Python generator`
+- `[ui] Add node canvas context menu`
 
 ### Branches
 - `main`: Stable only

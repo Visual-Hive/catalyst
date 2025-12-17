@@ -1,4 +1,4 @@
-# Rise Implementation Standards
+# Catalyst Implementation Standards
 
 **Philosophy: Quality over Speed. Documentation over Code. Understanding over Output.**
 
@@ -21,7 +21,7 @@
 
 ## Philosophy
 
-Rise is a complex system that will evolve over years. Every line of code must be:
+Catalyst is a complex system that will evolve over years. Every line of code must be:
 
 1. **Self-explanatory** through comments
 2. **Well-documented** in external docs

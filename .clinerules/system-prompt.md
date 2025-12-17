@@ -1,6 +1,6 @@
-# Rise Low-Code Builder Development
+# Catalyst Workflow Builder Development
 
-You are developing Rise, an AI-powered visual low-code builder. This is a complex Electron desktop application that generates clean React code.
+You are developing Catalyst, an AI-powered visual workflow builder. This is an Electron desktop application that generates clean, production-ready Python code for server-side automation.
 
 ## 🚨 CRITICAL: Implementation Standards
 
@@ -28,12 +28,12 @@ You are developing Rise, an AI-powered visual low-code builder. This is a comple
 
 3. **Architecture Adherence**
    - Follow the plugin-ready architecture in docs/ARCHITECTURE.md
-   - Keep framework-specific code isolated in plugin adapters
+   - Keep Python-specific code isolated in plugin adapters
    - Maintain clean separation: manifest (data) vs UI (presentation)
-   - Follow the two-tier expression system (sandboxed vs. full power)
+   - Workflow nodes → Python code generation
 
 4. **Code Quality Standards**
-   - Write TypeScript for all application code
+   - Write TypeScript for all editor code
    - Include comprehensive JSDoc comments
    - Follow functional programming principles
    - Use meaningful names
@@ -41,7 +41,6 @@ You are developing Rise, an AI-powered visual low-code builder. This is a comple
    - Write unit tests for core logic
 
 5. **Security First**
-   - Expression sandboxing is CRITICAL - never bypass
    - Validate all user input
    - Use proper IPC patterns in Electron
    - Store sensitive data in system keychain
@@ -51,10 +50,10 @@ You are developing Rise, an AI-powered visual low-code builder. This is a comple
    - Update docs when making architectural changes
    - Add comments explaining complex logic
    - Include usage examples
-   - Keep README and DOCUMENTATION_INDEX.md in sync
+   - Keep README and docs in sync
 
 7. **AI Integration Philosophy**
-   - Rise is a COPILOT, not autopilot
+   - Catalyst is a COPILOT, not autopilot
    - Always provide options, never force decisions
    - Track authorship (user vs. AI)
    - Make AI suggestions reviewable and rejectable
@@ -74,10 +73,10 @@ You are developing Rise, an AI-powered visual low-code builder. This is a comple
 - Debounce saves (500ms)
 
 ### Code Generation
-- Generate in worker threads
-- Use Babel for AST manipulation
-- Include comment markers
-- Preserve user edits
+- Generate Python/FastAPI code from workflows
+- Include comment markers for traceability
+- Support streaming and async patterns
+- Preserve user customizations
 
 ### Error Handling
 - Use Result<T, Error> types
@@ -95,7 +94,7 @@ You are developing Rise, an AI-powered visual low-code builder. This is a comple
 ## File Organization
 
 ```
-rise/
+catalyst/
 ├── src/
 │   ├── main/       # Electron main
 │   ├── renderer/   # React UI
