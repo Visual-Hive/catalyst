@@ -51,7 +51,7 @@ import { useManifestStore } from '../../store/manifestStore';
 import { ComponentNode } from './ComponentNode';
 import { AddComponentDialog } from './AddComponentDialog';
 import { ContextMenu, type ContextMenuItem } from '../ContextMenu';
-import type { ComponentTreeNode } from '../../../core/manifest/types';
+import type { ComponentTreeNode } from '../../../core/legacy-manifest/types';
 
 /**
  * Component tree props

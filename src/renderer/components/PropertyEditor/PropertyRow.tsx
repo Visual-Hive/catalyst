@@ -44,7 +44,7 @@ import React, { useMemo } from 'react';
 import { XMarkIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { PropertyInput } from './PropertyInput';
 import { templateRegistry } from '../../../core/templates';
-import type { ComponentProperty, StaticProperty, PropProperty } from '../../../core/manifest/types';
+import type { ComponentProperty, StaticProperty, PropProperty } from '../../../core/legacy-manifest/types';
 
 /**
  * Props for PropertyRow component

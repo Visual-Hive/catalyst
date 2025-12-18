@@ -40,7 +40,7 @@
  * @performance-critical false
  */
 
-import type { ComponentProperty } from '../manifest/types';
+import type { ComponentProperty } from '../legacy-manifest/types';
 import type { BuilderContext, PropsBuildResult, IBuilder } from './types';
 import { isStaticProperty, isPropProperty, getPropertyValue, getPropertyDataType } from './types';
 

@@ -34,7 +34,7 @@ import {
   ChevronRightIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline';
-import type { Component } from '../../../core/manifest/types';
+import type { Component } from '../../../core/legacy-manifest/types';
 
 /**
  * Component icon props

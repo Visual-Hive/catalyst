@@ -61,7 +61,7 @@ import { useManifestStore } from '../../store/manifestStore';
 import { InlineStylesEditor } from './InlineStylesEditor';
 import { VisualStyleEditor } from '../StyleEditor';
 import { TAILWIND_CLASS_SUGGESTIONS } from '../../../core/templates/componentTemplates';
-import type { Component, ComponentStyling } from '../../../core/manifest/types';
+import type { Component, ComponentStyling } from '../../../core/legacy-manifest/types';
 
 /**
  * Editing mode for styling: visual controls vs text-based

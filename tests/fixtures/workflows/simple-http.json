@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectType": "workflow",
+  "metadata": {
+    "projectName": "Simple HTTP Workflow",
+    "description": "Basic HTTP endpoint that logs requests",
+    "author": "Test Suite",
+    "createdAt": "2025-12-18T00:00:00Z",
+    "updatedAt": "2025-12-18T00:00:00Z"
+  },
+  "config": {
+    "runtime": "python",
+    "pythonVersion": "3.11",
+    "framework": "fastapi",
+    "port": 8000
+  },
+  "secrets": {},
+  "globalVariables": {},
+  "workflows": {
+    "simple_endpoint": {
+      "id": "simple_endpoint",
+      "name": "Simple Endpoint",
+      "description": "Receives HTTP POST requests and logs them",
+      "trigger": {
+        "type": "httpEndpoint",
+        "config": {
+          "method": "POST",
+          "path": "/api/test"
+        }
+      },
+      "input": {
+        "message": {
+          "type": "string",
+          "required": true,
+          "description": "Message to log"
+        }
+      },
+      "output": {
+        "type": "json"
+      },
+      "nodes": {
+        "node_log_1": {
+          "id": "node_log_1",
+          "type": "log",
+          "name": "Log Message",
+          "position": {
+            "x": 400,
+            "y": 200
+          },
+          "config": {
+            "level": "info",
+            "message": "Received message: {{ input.message }}"
+          }
+        }
+      },
+      "edges": []
+    }
+  }
+}

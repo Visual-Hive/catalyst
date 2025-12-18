@@ -48,7 +48,7 @@ import { PlusIcon, BoltIcon } from '@heroicons/react/24/outline';
 import { PropertyRow } from './PropertyRow';
 import { AddPropertyDialog, type AddPropertyData } from './AddPropertyDialog';
 import { useManifestStore } from '../../store/manifestStore';
-import type { Component, ComponentProperty, StaticProperty, PropertyDataType } from '../../../core/manifest/types';
+import type { Component, ComponentProperty, StaticProperty, PropertyDataType } from '../../../core/legacy-manifest/types';
 
 /**
  * Props for PropertiesEditor component

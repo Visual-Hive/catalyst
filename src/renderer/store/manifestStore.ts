@@ -50,7 +50,7 @@ import {
   createEmptyManifest,
   generateComponentId,
   createComponentMetadata,
-} from '../../core/manifest/types';
+} from '../../core/legacy-manifest/types';
 import { templateRegistry } from '../../core/templates';
 import { useProjectStore } from './projectStore';
 import type {

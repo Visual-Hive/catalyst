@@ -36,7 +36,7 @@
 
 import React, { useMemo } from 'react';
 import { templateRegistry } from '../../../core/templates';
-import type { ComponentProperty, PropProperty } from '../../../core/manifest/types';
+import type { ComponentProperty, PropProperty } from '../../../core/legacy-manifest/types';
 import type { EnumOption } from '../../../core/templates/types';
 
 /**

@@ -58,7 +58,7 @@ import {
   type StylePropertyDef,
   type StyleCategoryDef,
 } from '../../../core/templates/componentTemplates';
-import type { Component, ComponentStyling } from '../../../core/manifest/types';
+import type { Component, ComponentStyling } from '../../../core/legacy-manifest/types';
 
 /**
  * Props for InlineStylesEditor component

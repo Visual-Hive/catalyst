@@ -37,7 +37,7 @@ import { BoltIcon, PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/o
 import { useLogicStore } from '../../store/logicStore';
 import { useManifestStore } from '../../store/manifestStore';
 import { useLayout } from '../../hooks/useLayout';
-import type { Component } from '../../../core/manifest/types';
+import type { Component } from '../../../core/legacy-manifest/types';
 
 // ============================================================
 // TYPES

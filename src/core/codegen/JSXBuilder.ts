@@ -43,7 +43,7 @@
  * @performance-critical false
  */
 
-import type { Component, ComponentProperty } from '../manifest/types';
+import type { Component, ComponentProperty } from '../legacy-manifest/types';
 import type { BuilderContext, JSXBuildResult, IBuilder } from './types';
 import {
   isSelfClosingTag,

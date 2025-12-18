@@ -26,7 +26,7 @@
 
 import React, { useCallback } from 'react';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
-import type { ComponentTreeNode } from '../../../core/manifest/types';
+import type { ComponentTreeNode } from '../../../core/legacy-manifest/types';
 import { ComponentIcon } from './ComponentIcon';
 
 /**

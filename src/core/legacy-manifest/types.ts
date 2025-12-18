@@ -1,11 +1,14 @@
 /**
  * @file types.ts
- * @description Type definitions for Rise manifest (Level 1 & Level 1.5)
+ * @description LEGACY - Type definitions for React component manifest (Level 1 & Level 1.5)
+ * 
+ * ⚠️ DEPRECATED: This is the OLD React component system from Rise.
+ * NEW DEVELOPMENT: Use src/core/workflow/types.ts for Python workflow system.
  * 
  * @architecture Phase 2, Task 2.1 - Component Tree UI (Level 1)
  * @architecture Phase 4, Task 4.0 - Logic System Foundation (Level 1.5)
  * @created 2025-11-25
- * @updated 2025-11-29
+ * @updated 2025-12-18 - Marked as legacy (Phase 0, Task 0.2)
  * @author AI (Cline) + Human Review
  * @confidence 9/10 - Based on COMPONENT_SCHEMA.md and phase-4-micro-logic-editor.md
  * 
@@ -93,7 +96,7 @@ export interface BuildConfig {
  */
 export interface PluginConfig {
   framework: {
-    name: '@rise/plugin-react';
+    name: '@catalyst/plugin-react';
     version: string;
   };
 }
@@ -405,7 +408,7 @@ export const createEmptyManifest = (): Manifest => ({
   },
   plugins: {
     framework: {
-      name: '@rise/plugin-react',
+      name: '@catalyst/plugin-react',
       version: '1.0.0',
     },
   },
@@ -433,7 +436,7 @@ export const createEmptyLevel15Manifest = (): Manifest => ({
   },
   plugins: {
     framework: {
-      name: '@rise/plugin-react',
+      name: '@catalyst/plugin-react',
       version: '1.0.0',
     },
   },

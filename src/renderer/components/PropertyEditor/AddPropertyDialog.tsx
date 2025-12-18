@@ -55,7 +55,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { templateRegistry } from '../../../core/templates';
-import type { PropertyDataType } from '../../../core/manifest/types';
+import type { PropertyDataType } from '../../../core/legacy-manifest/types';
 
 /**
  * Data returned when a property is added

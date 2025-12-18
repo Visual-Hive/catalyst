@@ -1,6 +1,6 @@
 /**
  * @file src/renderer/App.tsx
- * @description Root React component for the Rise application
+ * @description Root React component for the Catalyst application (forked from Rise)
  * 
  * @architecture Phase 1, Task 1.2 - Three-Panel Layout (updated Task 1.4B)
  * @created 2025-11-19
@@ -40,6 +40,12 @@ import { useManifestStore } from './store/manifestStore';
 import { useAIStore } from './store/aiStore';
 import { useGenerationStore } from './store/generationStore';
 import { GenerationService } from './services/GenerationService';
+
+// TEMPORARY: Import WorkflowCanvasTest for testing (Task 0.5)
+import { WorkflowCanvasTest } from './components/WorkflowCanvas/WorkflowCanvasTest';
+
+// TEMPORARY: Set to true to test WorkflowCanvas, false for normal app
+const SHOW_WORKFLOW_TEST = true;
 
 /**
  * Root application component
@@ -189,6 +195,11 @@ function App() {
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [openDialog, openOpenDialog, currentProject]);
+
+  // TEMPORARY: Show WorkflowCanvas test page instead of normal app
+  if (SHOW_WORKFLOW_TEST) {
+    return <WorkflowCanvasTest />;
+  }
 
   return (
     <>

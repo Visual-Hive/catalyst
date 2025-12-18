@@ -44,7 +44,7 @@ import { APIUsageTracker } from '../../core/security/APIUsageTracker';
 import { SecurityLogger } from '../../core/security/SecurityLogger';
 import { SecurityEventType, SecuritySeverity } from '../../core/security/types';
 import { templateRegistry } from '../../core/templates/TemplateRegistry';
-import type { Component, ComponentStyling, ComponentProperty } from '../../core/manifest/types';
+import type { Component, ComponentStyling, ComponentProperty } from '../../core/legacy-manifest/types';
 import type {
   GenerationContext,
   GenerationResult,
@@ -495,7 +495,7 @@ export class AIComponentGenerator {
    * @returns Complete prompt for Claude
    */
   private buildPrompt(userPrompt: string, context: GenerationContext): string {
-    return `You are a React component architect for Rise, a visual low-code builder.
+    return `You are a React component architect for Catalyst, a visual workflow builder (forked from Rise).
 Generate a component schema based on the user's request.
 
 USER REQUEST:

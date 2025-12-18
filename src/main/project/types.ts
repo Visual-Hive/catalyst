@@ -1,6 +1,6 @@
 /**
  * @file types.ts
- * @description TypeScript type definitions for project management
+ * @description TypeScript type definitions for project management (forked from Rise)
  * 
  * Provides core interfaces for:
  * - Project data structures
@@ -101,9 +101,9 @@ export interface RecentProject {
  * 
  * Persisted to app data directory as JSON file.
  * Location:
- * - macOS: ~/Library/Application Support/Rise/recent-projects.json
- * - Windows: %APPDATA%/Rise/recent-projects.json
- * - Linux: ~/.config/Rise/recent-projects.json
+ * - macOS: ~/Library/Application Support/Catalyst/recent-projects.json
+ * - Windows: %APPDATA%/Catalyst/recent-projects.json
+ * - Linux: ~/.config/Catalyst/recent-projects.json
  */
 export interface RecentProjectsData {
   /** List of recent projects (max 10) */

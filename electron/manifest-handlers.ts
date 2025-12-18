@@ -103,7 +103,7 @@ function createEmptyManifest(projectName: string): Manifest {
     },
     plugins: {
       framework: {
-        name: '@rise/plugin-react',
+        name: '@catalyst/plugin-react',
         version: '1.0.0',
       },
     },

@@ -14,7 +14,7 @@
  * @performance-critical false
  */
 
-import type { Component } from '../../core/manifest/types';
+import type { Component } from '../../core/legacy-manifest/types';
 
 /**
  * Supported AI providers

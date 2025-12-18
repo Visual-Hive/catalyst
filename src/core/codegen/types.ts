@@ -39,7 +39,7 @@ import type {
   Manifest,
   StaticProperty,
   PropProperty,
-} from '../manifest/types';
+} from '../legacy-manifest/types';
 
 // ============================================================================
 // GENERATION OPTIONS

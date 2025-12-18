@@ -40,7 +40,7 @@
  */
 
 import * as prettier from 'prettier';
-import type { Component, Manifest } from '../manifest/types';
+import type { Component, Manifest } from '../legacy-manifest/types';
 import type {
   GenerationOptions,
   GenerationResult,

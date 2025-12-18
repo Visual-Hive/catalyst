@@ -188,9 +188,20 @@ generated-project/
 | Document | Purpose |
 |----------|---------|
 | `CATALYST_SPECIFICATION.md` | Full technical specification |
-| `CATALYST_CLINE_IMPLEMENTATION.md` | Detailed task specs for Cline |
-| `CATALYST_VISUAL_HIVE_MIGRATION.md` | n8n → Catalyst migration guide |
 | `CATALYST_PROJECT_SUMMARY.md` | This document - quick reference |
+| `CATALYST_VISUAL_HIVE_MIGRATION.md` | n8n → Catalyst migration guide |
+| `CATALYST_PERFORMANCE_REQUIREMENTS.md` | Performance stack and optimization patterns |
+
+### Implementation Task Documents
+
+| Document | Phase | Key Topics |
+|----------|-------|------------|
+| `CATALYST_CLINE_IMPLEMENTATION.md` | Overview | Index to all phase documents, human review checkpoints |
+| `CATALYST_PHASE_0_TASKS.md` | Phase 0 | Fork/rebrand, manifest schema, node types, workflow store |
+| `CATALYST_PHASE_1_TASKS.md` | Phase 1 | Python codegen, performance stack, ExecutionContext, ConnectionPools |
+| `CATALYST_PHASE_2_TASKS.md` | Phase 2 | LLM nodes, streaming infrastructure, embeddings |
+| `CATALYST_PHASE_3_TASKS.md` | Phase 3 | Qdrant, PostgreSQL, Redis, @cached decorator |
+| `CATALYST_PHASE_4_TASKS.md` | Phase 4 | Parallel execution, loops, RateLimiter, custom code |
 
 ---
 

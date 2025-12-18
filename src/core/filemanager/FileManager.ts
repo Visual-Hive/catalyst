@@ -46,7 +46,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { EventEmitter } from 'events';
-import type { Manifest, Component } from '../manifest/types';
+import type { Manifest, Component } from '../legacy-manifest/types';
 import type { FileChangeTracker } from '../FileChangeTracker';
 import { ReactCodeGenerator } from '../codegen/ReactCodeGenerator';
 import { FlowCodeGenerator } from '../codegen/FlowCodeGenerator';

@@ -219,7 +219,7 @@ Generate multiple child elements to create meaningful structure.`,
  * - {patternHint} - Pattern-specific example (from UI_PATTERN_EXAMPLES)
  * - {existingComponents} - List of existing component names to avoid conflicts
  */
-export const ENHANCED_COMPONENT_PROMPT = `You are a React component architect for Rise, a visual low-code builder.
+export const ENHANCED_COMPONENT_PROMPT = `You are a React component architect for Catalyst, a visual workflow builder (forked from Rise).
 Your task is to generate a VISUALLY COMPLETE component schema with proper hierarchy, styling, and content.
 
 USER REQUEST:

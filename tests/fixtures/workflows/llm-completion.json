@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectType": "workflow",
+  "metadata": {
+    "projectName": "LLM Completion Workflow",
+    "description": "Workflow with Claude and conditional logic",
+    "author": "Test Suite",
+    "createdAt": "2025-12-18T00:00:00Z",
+    "updatedAt": "2025-12-18T00:00:00Z"
+  },
+  "config": {
+    "runtime": "python",
+    "pythonVersion": "3.11",
+    "framework": "fastapi",
+    "port": 8000
+  },
+  "secrets": {
+    "ANTHROPIC_API_KEY": {
+      "required": true,
+      "description": "Claude API key"
+    }
+  },
+  "globalVariables": {
+    "DEFAULT_MODEL": "claude-sonnet-4-5-20250514",
+    "MAX_TOKENS": 1000
+  },
+  "workflows": {
+    "analyze_text": {
+      "id": "analyze_text",
+      "name": "Analyze Text",
+      "description": "Uses Claude to analyze text input",
+      "trigger": {
+        "type": "httpEndpoint",
+        "config": {
+          "method": "POST",
+          "path": "/api/v1/analyze"
+        }
+      },
+      "input": {
+        "text": {
+          "type": "string",
+          "required": true,
+          "description": "Text to analyze"
+        }
+      },
+      "output": {
+        "type": "json"
+      },
+      "nodes": {
+        "node_claude_1": {
+          "id": "node_claude_1",
+          "type": "anthropicCompletion",
+          "name": "Analyze with Claude",
+          "position": {
+            "x": 400,
+            "y": 200
+          },
+          "config": {
+            "model": "{{ global.DEFAULT_MODEL }}",
+            "messages": [
+              {
+                "role": "user",
+                "content": "Analyze the following text and provide sentiment: {{ input.text }}"
+              }
+            ],
+            "maxTokens": 1000,
+            "temperature": 0.7
+          }
+        },
+        "node_condition_1": {
+          "id": "node_condition_1",
+          "type": "condition",
+          "name": "Check Sentiment",
+          "position": {
+            "x": 600,
+            "y": 200
+          },
+          "config": {
+            "expression": "{{ nodes.node_claude_1.output.sentiment == 'positive' }}",
+            "trueTarget": "node_log_positive",
+            "falseTarget": "node_log_negative"
+          }
+        },
+        "node_log_positive": {
+          "id": "node_log_positive",
+          "type": "log",
+          "name": "Log Positive",
+          "position": {
+            "x": 800,
+            "y": 100
+          },
+          "config": {
+            "level": "info",
+            "message": "Positive sentiment detected"
+          }
+        },
+        "node_log_negative": {
+          "id": "node_log_negative",
+          "type": "log",
+          "name": "Log Negative",
+          "position": {
+            "x": 800,
+            "y": 300
+          },
+          "config": {
+            "level": "warn",
+            "message": "Negative sentiment detected"
+          }
+        }
+      },
+      "edges": [
+        {
+          "id": "edge_1",
+          "source": "node_claude_1",
+          "target": "node_condition_1"
+        },
+        {
+          "id": "edge_2",
+          "source": "node_condition_1",
+          "target": "node_log_positive",
+          "sourceHandle": "true"
+        },
+        {
+          "id": "edge_3",
+          "source": "node_condition_1",
+          "target": "node_log_negative",
+          "sourceHandle": "false"
+        }
+      ]
+    }
+  }
+}

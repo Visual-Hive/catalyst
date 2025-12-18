@@ -35,7 +35,7 @@
  */
 
 import * as crypto from 'crypto';
-import type { Component } from '../manifest/types';
+import type { Component } from '../legacy-manifest/types';
 import type {
   IChangeDetector,
   ChangeDetectionResult,

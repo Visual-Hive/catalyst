@@ -43,7 +43,7 @@
 import { useManifestStore } from '../store/manifestStore';
 import { useGenerationStore } from '../store/generationStore';
 import { useProjectStore } from '../store/projectStore';
-import type { Manifest } from '../../core/manifest/types';
+import type { Manifest } from '../../core/legacy-manifest/types';
 import type { ElectronAPI } from '../types/electron';
 
 // Access to Electron API via contextBridge

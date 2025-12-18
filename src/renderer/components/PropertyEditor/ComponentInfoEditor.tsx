@@ -41,7 +41,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useManifestStore } from '../../store/manifestStore';
 import { ComponentIcon } from '../ComponentTree/ComponentIcon';
-import type { Component } from '../../../core/manifest/types';
+import type { Component } from '../../../core/legacy-manifest/types';
 
 /**
  * Available component categories
