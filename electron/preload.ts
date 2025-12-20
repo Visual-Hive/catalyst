@@ -254,6 +254,66 @@ export interface ValidationError {
 }
 
 /**
+ * Workflow API interface
+ * 
+ * Controls Python code generation from workflow definitions.
+ */
+export interface WorkflowAPI {
+  /** Generate Python code from workflow */
+  generatePython: (request: GeneratePythonRequest) => Promise<GeneratePythonResult>;
+  
+  /** Validate workflow without generating code */
+  validate: (request: ValidateWorkflowRequest) => Promise<ValidateWorkflowResult>;
+  
+  /** Get code preview without writing files */
+  getCodePreview: (request: PreviewCodeRequest) => Promise<PreviewCodeResult>;
+}
+
+/**
+ * Workflow generation request parameters
+ */
+export interface GeneratePythonRequest {
+  projectPath: string;
+  workflowId: string;
+  filename?: string;
+}
+
+export interface ValidateWorkflowRequest {
+  workflowId: string;
+}
+
+export interface PreviewCodeRequest {
+  workflowId: string;
+}
+
+/**
+ * Workflow generation result types
+ */
+export interface GeneratePythonResult {
+  success: boolean;
+  data?: {
+    filepath: string;
+    nodeCount: number;
+    dependencies: string[];
+    warnings?: string[];
+  };
+  error?: string;
+}
+
+export interface ValidateWorkflowResult {
+  success: boolean;
+  errors?: string[];
+  warnings?: string[];
+}
+
+export interface PreviewCodeResult {
+  success: boolean;
+  code?: string;
+  dependencies?: string[];
+  error?: string;
+}
+
+/**
  * Preview API interface
  * 
  * Controls the Vite dev server for project preview.
@@ -333,6 +393,9 @@ export interface ElectronAPI {
   
   // Code generation system (Task 3.3)
   generation: GenerationAPI;
+  
+  // Workflow system (Phase 2 LLM integration)
+  workflow: WorkflowAPI;
   
   // File operations (to be implemented in future tasks)
   // readFile: (filepath: string) => Promise<string>;
@@ -535,6 +598,21 @@ const electronAPI: ElectronAPI = {
     
     // Get current FileManager status
     status: () => ipcRenderer.invoke('generation:status'),
+  },
+  
+  // Workflow system (Phase 2 LLM integration)
+  workflow: {
+    // Generate Python code from workflow
+    generatePython: (request: GeneratePythonRequest) =>
+      ipcRenderer.invoke('workflow:generate-python', request),
+    
+    // Validate workflow without generating code
+    validate: (request: ValidateWorkflowRequest) =>
+      ipcRenderer.invoke('workflow:validate', request),
+    
+    // Get code preview without writing files
+    getCodePreview: (request: PreviewCodeRequest) =>
+      ipcRenderer.invoke('workflow:get-code-preview', request),
   },
   
   // File operations will be added in future tasks

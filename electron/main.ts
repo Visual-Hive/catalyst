@@ -21,6 +21,7 @@
 import { app, BrowserWindow, Menu, shell } from 'electron';
 import path from 'path';
 import { setupIpcHandlers, cleanupPreviewServer, cleanupIpcHandlers } from './ipc-handlers';
+import { setupWorkflowGenerationHandlers, cleanupWorkflowGenerationHandlers } from './workflow-generation-handlers';
 
 /**
  * Main application window instance
@@ -253,6 +254,9 @@ app.whenReady().then(async () => {
 
   // Set up IPC handlers (now async for ProjectManager initialization)
   await setupIpcHandlers();
+  
+  // Set up workflow generation handlers (Phase 2 LLM integration)
+  setupWorkflowGenerationHandlers();
 
   // Create application menu
   createApplicationMenu();
@@ -299,6 +303,9 @@ app.on('before-quit', async (event) => {
     
     // Clean up IPC handlers
     cleanupIpcHandlers();
+    
+    // Clean up workflow generation handlers
+    cleanupWorkflowGenerationHandlers();
     
     console.log('[INFO] Cleanup complete, quitting...');
   } catch (error) {

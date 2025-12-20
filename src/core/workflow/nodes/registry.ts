@@ -175,7 +175,7 @@ export const NODE_REGISTRY: NodeRegistry = {
     phase: 0,
   },
   
-  // 🚧 STUB
+  // ✅ CORE (Phase 2)
   groqCompletion: {
     type: 'groqCompletion',
     category: 'llm',
@@ -186,7 +186,7 @@ export const NODE_REGISTRY: NodeRegistry = {
     inputs: [{ id: 'input', name: 'Input', type: 'default' }],
     outputs: [{ id: 'output', name: 'Response', type: 'default' }],
     configSchema: genericNodeConfigSchema,
-    implemented: false,
+    implemented: true,
     phase: 2,
   },
   
@@ -205,7 +205,7 @@ export const NODE_REGISTRY: NodeRegistry = {
     phase: 2,
   },
   
-  // 🚧 STUB
+  // ✅ CORE (Phase 2)
   embeddingGenerate: {
     type: 'embeddingGenerate',
     category: 'llm',
@@ -216,11 +216,11 @@ export const NODE_REGISTRY: NodeRegistry = {
     inputs: [{ id: 'input', name: 'Text', type: 'default' }],
     outputs: [{ id: 'output', name: 'Vector', type: 'default' }],
     configSchema: genericNodeConfigSchema,
-    implemented: false,
+    implemented: true,
     phase: 2,
   },
   
-  // 🚧 STUB
+  // ✅ CORE (Phase 2)
   promptTemplate: {
     type: 'promptTemplate',
     category: 'llm',
@@ -231,7 +231,7 @@ export const NODE_REGISTRY: NodeRegistry = {
     inputs: [{ id: 'input', name: 'Variables', type: 'default' }],
     outputs: [{ id: 'output', name: 'Prompt', type: 'default' }],
     configSchema: genericNodeConfigSchema,
-    implemented: false,
+    implemented: true,
     phase: 2,
   },
   
@@ -250,7 +250,7 @@ export const NODE_REGISTRY: NodeRegistry = {
     phase: 5,
   },
   
-  // 🚧 STUB
+  // ✅ CORE (Phase 2)
   llmRouter: {
     type: 'llmRouter',
     category: 'llm',
@@ -261,8 +261,8 @@ export const NODE_REGISTRY: NodeRegistry = {
     inputs: [{ id: 'input', name: 'Input', type: 'default' }],
     outputs: [{ id: 'output', name: 'Response', type: 'default' }],
     configSchema: genericNodeConfigSchema,
-    implemented: false,
-    phase: 5,
+    implemented: true,
+    phase: 2,
   },
   
   // ============================================================

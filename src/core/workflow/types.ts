@@ -352,6 +352,59 @@ export interface OpenAICompletionConfig {
 }
 
 /**
+ * Embedding generation node configuration
+ * CORE: Fully implemented (Phase 2, Task 2.5)
+ */
+export interface EmbeddingGenerateConfig {
+  provider: 'openai' | 'voyage';  // Embedding provider
+  model: string;                  // e.g., "text-embedding-3-small", "voyage-2"
+  input: string | string[];       // Single text or array of texts
+  dimensions?: number;            // Optional dimension override (OpenAI only)
+  batchSize?: number;             // Max texts per request (default: 100)
+}
+
+/**
+ * Prompt template node configuration
+ * CORE: Fully implemented (Phase 2, Task 2.6)
+ */
+export interface PromptTemplateConfig {
+  system?: string;                // Optional system message template
+  messages: Array<{               // Message templates (REQUIRED)
+    role: 'system' | 'user' | 'assistant';
+    content: string;              // Template with {{ }} expressions
+  }>;
+  variables?: Record<string, ConfigValue>;  // Additional variables for interpolation
+}
+
+/**
+ * LLM Router node configuration
+ * CORE: Fully implemented (Phase 2, Task 2.7)
+ * 
+ * Intelligently routes LLM requests to different providers based on
+ * conditions like cost, speed, quality, or custom logic. Enables
+ * cost optimization and performance tuning.
+ */
+export interface LLMRouterConfig {
+  strategy?: 'cost' | 'speed' | 'quality' | 'balanced' | 'custom';  // Preset or custom routing
+  routes: Array<{                 // Routing rules (evaluated in order)
+    condition: string;            // Expression or "always"
+    provider: 'anthropic' | 'openai' | 'groq';  // Target provider
+    model: string;                // Model to use for this provider
+  }>;
+  fallback: {                     // Default when no conditions match
+    provider: 'anthropic' | 'openai' | 'groq';
+    model: string;
+  };
+  messages: Array<{               // Messages to route
+    role: 'system' | 'user' | 'assistant';
+    content: string;              // Supports expressions
+  }>;
+  system?: string;                // Optional system prompt
+  max_tokens?: number;            // Optional max tokens
+  temperature?: number;           // Optional temperature
+}
+
+/**
  * Qdrant vector search configuration
  * CORE: Fully implemented
  */

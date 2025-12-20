@@ -23,8 +23,10 @@
  * @performance-critical false
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useReactFlow } from 'reactflow';
+import { useWorkflowStore } from '../../store/workflowStore';
+import { useProjectStore } from '../../store/projectStore';
 
 // ============================================================
 // TYPES
@@ -55,6 +57,16 @@ export function WorkflowToolbar({ workflowId }: WorkflowToolbarProps) {
   // Get React Flow instance for canvas control
   const { fitView } = useReactFlow();
   
+  // Get workflow store to access manifest
+  const manifest = useWorkflowStore((state) => state.manifest);
+  
+  // Get current project path
+  const currentProject = useProjectStore((state) => state.currentProject);
+  
+  // Generation state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<string>('');
+  
   /**
    * Fit all nodes into view
    * Animates the canvas to show all nodes with padding
@@ -75,12 +87,63 @@ export function WorkflowToolbar({ workflowId }: WorkflowToolbarProps) {
     // Future: Check for disconnected nodes, invalid configs, etc.
   };
   
+  /**
+   * Generate Python code from workflow
+   * Calls IPC handler to generate FastAPI Python file
+   */
+  const handleGeneratePython = async () => {
+    if (!currentProject || !manifest) {
+      console.error('[WorkflowToolbar] No project or manifest loaded');
+      setGenerationStatus('❌ Error: No project loaded');
+      setTimeout(() => setGenerationStatus(''), 3000);
+      return;
+    }
+    
+    try {
+      setIsGenerating(true);
+      setGenerationStatus('⏳ Generating...');
+      
+      console.log('[WorkflowToolbar] Generating Python for workflow:', workflowId);
+      
+      // Call IPC handler
+      const result = await window.electronAPI.workflow.generatePython({
+        projectPath: currentProject.path,
+        workflowId: workflowId,
+        manifest: manifest,
+      });
+      
+      if (result.success && result.data) {
+        console.log('[WorkflowToolbar] Generation successful:', result.data);
+        setGenerationStatus(`✅ Generated: ${result.data.nodeCount} nodes`);
+        setTimeout(() => setGenerationStatus(''), 5000);
+      } else {
+        console.error('[WorkflowToolbar] Generation failed:', result.error);
+        setGenerationStatus(`❌ Error: ${result.error}`);
+        setTimeout(() => setGenerationStatus(''), 5000);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[WorkflowToolbar] Generation error:', message);
+      setGenerationStatus(`❌ Error: ${message}`);
+      setTimeout(() => setGenerationStatus(''), 5000);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
   return (
     <div className="bg-white border-b border-gray-200 px-3 py-2 flex items-center gap-2">
       {/* Workflow name indicator */}
       <div className="text-sm font-medium text-gray-700 mr-auto">
         Workflow Canvas
       </div>
+      
+      {/* Generation status */}
+      {generationStatus && (
+        <div className="text-sm text-gray-600">
+          {generationStatus}
+        </div>
+      )}
       
       {/* Fit view button */}
       <button
@@ -89,6 +152,16 @@ export function WorkflowToolbar({ workflowId }: WorkflowToolbarProps) {
         title="Fit all nodes in view"
       >
         🔍 Fit View
+      </button>
+      
+      {/* Generate Python button */}
+      <button
+        onClick={handleGeneratePython}
+        disabled={isGenerating || !manifest || !currentProject}
+        className="px-3 py-1 text-sm bg-green-50 hover:bg-green-100 text-green-700 rounded border border-green-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Generate Python/FastAPI code from workflow"
+      >
+        {isGenerating ? '⏳ Generating...' : '🐍 Generate Python'}
       </button>
       
       {/* Validate button (future feature) */}
