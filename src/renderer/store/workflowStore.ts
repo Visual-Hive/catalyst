@@ -226,6 +226,37 @@ export interface WorkflowState {
    */
   selectNode: (nodeId: string | null) => void;
   
+  /**
+   * Update a specific config field in a node
+   * Supports nested field paths (e.g., 'options.temperature')
+   * 
+   * This is a specialized update method for property panel forms.
+   * It handles nested config paths and special fields like 'name'.
+   * 
+   * @param workflowId - Workflow containing the node
+   * @param nodeId - Node ID to update
+   * @param fieldPath - Field path (dot notation for nested, e.g., 'options.temperature')
+   * @param value - New value for the field
+   * 
+   * @example
+   * ```typescript
+   * // Update simple field
+   * updateNodeConfig(workflowId, nodeId, 'apiKey', 'sk-...');
+   * 
+   * // Update nested field
+   * updateNodeConfig(workflowId, nodeId, 'options.temperature', 0.7);
+   * 
+   * // Update node name (special case)
+   * updateNodeConfig(workflowId, nodeId, 'name', 'My Custom Name');
+   * ```
+   */
+  updateNodeConfig: (
+    workflowId: string,
+    nodeId: string,
+    fieldPath: string,
+    value: any
+  ) => void;
+  
   // ============================================================
   // ACTIONS - EDGES
   // ============================================================
@@ -665,6 +696,70 @@ export const useWorkflowStore = create<WorkflowState>()(
             // Update selection
             state.selectedNodeId = nodeId;
           });
+        },
+        
+        updateNodeConfig: (
+          workflowId: string,
+          nodeId: string,
+          fieldPath: string,
+          value: any
+        ) => {
+          const state = get();
+          
+          // Cannot update if workflow or node doesn't exist
+          if (
+            !state.manifest ||
+            !state.manifest.workflows[workflowId] ||
+            !state.manifest.workflows[workflowId].nodes[nodeId]
+          ) {
+            console.warn(
+              `[WorkflowStore] Cannot update config: Workflow or node not found: ${workflowId}/${nodeId}`
+            );
+            return;
+          }
+          
+          set((state) => {
+            const node = state.manifest!.workflows[workflowId].nodes[nodeId];
+            
+            // Special case: 'name' is a top-level node property
+            if (fieldPath === 'name') {
+              node.name = value;
+            } else {
+              // Handle nested paths (e.g., 'options.temperature')
+              const pathParts = fieldPath.split('.');
+              
+              // Ensure config object exists
+              if (!node.config) {
+                node.config = {};
+              }
+              
+              // Navigate to the parent object
+              let current: any = node.config;
+              for (let i = 0; i < pathParts.length - 1; i++) {
+                const part = pathParts[i];
+                
+                // Create nested object if it doesn't exist
+                if (!current[part] || typeof current[part] !== 'object') {
+                  current[part] = {};
+                }
+                
+                current = current[part];
+              }
+              
+              // Set the leaf value
+              const leafKey = pathParts[pathParts.length - 1];
+              current[leafKey] = value;
+            }
+            
+            // Update manifest timestamp
+            state.manifest!.metadata.updatedAt = new Date().toISOString();
+            
+            // Mark as dirty
+            state.isDirty = true;
+          });
+          
+          // Trigger auto-save
+          get().saveManifest().catch(console.error);
         },
         
         // ============================================================

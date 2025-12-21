@@ -59,6 +59,7 @@ import { useWorkflowStore } from '../../store/workflowStore';
 import { WorkflowNode } from './WorkflowNode';
 import { WorkflowNodePalette } from './WorkflowNodePalette';
 import { WorkflowToolbar } from './WorkflowToolbar';
+import { WorkflowPropertiesPanel } from './WorkflowPropertiesPanel';
 import { generateNodeId, type NodeType, type NodeDefinition } from '../../../core/workflow/types';
 import { getNodeMetadata } from '../../../core/workflow/nodes';
 
@@ -232,6 +233,14 @@ function WorkflowCanvasInner({ workflowId }: WorkflowCanvasInnerProps) {
     [selectNode]
   );
   
+  /**
+   * Handle canvas click (deselect node)
+   * Clicking empty canvas area clears selection
+   */
+  const onPaneClick = useCallback(() => {
+    selectNode(null);
+  }, [selectNode]);
+  
   // --------------------------------------------------------
   // DRAG AND DROP HANDLERS
   // --------------------------------------------------------
@@ -314,6 +323,7 @@ function WorkflowCanvasInner({ workflowId }: WorkflowCanvasInnerProps) {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         onDrop={onDrop}
         onDragOver={onDragOver}
         nodeTypes={nodeTypes}
@@ -397,17 +407,30 @@ interface WorkflowCanvasProps {
  * ```
  */
 export function WorkflowCanvas({ workflowId }: WorkflowCanvasProps) {
+  const selectedNodeId = useWorkflowStore((state) => state.selectedNodeId);
+  
   return (
-    // Flex container for toolbar + canvas layout
+    // Flex container for toolbar + canvas + properties panel layout
     // h-full and w-full ensure this takes up its parent's full dimensions
     <div className="h-full w-full flex flex-col">
       <ReactFlowProvider>
         {/* Toolbar - must be inside ReactFlowProvider to use useReactFlow */}
         <WorkflowToolbar workflowId={workflowId} />
         
-        {/* Canvas - flex-1 makes it fill remaining space */}
-        <div className="flex-1 min-h-0">
-          <WorkflowCanvasInner workflowId={workflowId} />
+        {/* Canvas + Properties Panel - flex row layout */}
+        <div className="flex-1 min-h-0 flex">
+          {/* Canvas - flex-1 makes it fill remaining space */}
+          <div className="flex-1">
+            <WorkflowCanvasInner workflowId={workflowId} />
+          </div>
+          
+          {/* Properties Panel - fixed width 320px (w-80) */}
+          <div className="w-80 flex-shrink-0">
+            <WorkflowPropertiesPanel
+              workflowId={workflowId}
+              selectedNodeId={selectedNodeId}
+            />
+          </div>
         </div>
       </ReactFlowProvider>
     </div>

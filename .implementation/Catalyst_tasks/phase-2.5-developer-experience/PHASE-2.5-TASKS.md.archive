@@ -1,0 +1,2364 @@
+# Catalyst Phase 2.5: Developer Experience & Testing
+## Making Catalyst Actually Usable for Building Workflows
+
+**Phase Duration:** 2-3 weeks  
+**Goal:** Add the critical UX features that make visual workflow builders productive  
+**Dependencies:** Phase 2 (Basic Python Generation) must be complete
+
+---
+
+## Overview
+
+Phase 2 gave us Python code generation, but Catalyst isn't usable yet because:
+- ❌ No way to configure nodes visually (properties panel missing)
+- ❌ No way to test individual nodes (all-or-nothing testing)
+- ❌ No execution history to learn from past runs
+- ❌ No way to pin test data to nodes
+- ❌ Data doesn't flow through nodes properly (n8n's "dunno which item" problem)
+
+This phase fixes all of that.
+
+---
+
+## Task 2.10: Workflow Properties Panel
+
+**Duration:** 2-3 days  
+**Confidence:** 7/10  
+**Priority:** CRITICAL - Without this, you can't configure nodes
+
+### Problem Statement
+
+Currently, nodes are created with hardcoded config in test files:
+```typescript
+addNode(workflowId, {
+  id: 'node_groq_1',
+  type: 'groqCompletion',
+  config: {
+    apiKey: 'hardcoded',
+    model: 'llama-3.1-70b-versatile',
+    // ... hardcoded config
+  }
+});
+```
+
+Users need a **visual properties panel** to configure nodes without writing code.
+
+### User Story
+
+As a workflow builder, I want to:
+1. Click on a node in the canvas
+2. See its configuration in the right panel
+3. Edit fields like API keys, model names, prompts
+4. Have changes automatically save to the workflow manifest
+5. See validation errors for invalid configs
+
+### Implementation Plan
+
+#### Step 1: Create Base Properties Panel Component
+
+**File:** `src/renderer/components/WorkflowCanvas/WorkflowPropertiesPanel.tsx`
+
+```typescript
+import React from 'react';
+import { useWorkflowStore } from '@/renderer/store/workflowStore';
+
+interface WorkflowPropertiesPanelProps {
+  workflowId: string;
+  selectedNodeId: string | null;
+}
+
+export function WorkflowPropertiesPanel({ 
+  workflowId, 
+  selectedNodeId 
+}: WorkflowPropertiesPanelProps) {
+  const workflow = useWorkflowStore((state) => 
+    state.workflows[workflowId]
+  );
+  
+  if (!selectedNodeId || !workflow) {
+    return <EmptyState />;
+  }
+  
+  const node = workflow.nodes[selectedNodeId];
+  
+  if (!node) {
+    return <EmptyState />;
+  }
+  
+  return (
+    <div className="h-full flex flex-col bg-gray-50">
+      <PanelHeader node={node} />
+      <div className="flex-1 overflow-y-auto p-4">
+        <NodeConfigForm 
+          workflowId={workflowId}
+          node={node}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+#### Step 2: Create Dynamic Form Generator
+
+**File:** `src/renderer/components/WorkflowCanvas/NodeConfigForm.tsx`
+
+This is the critical piece - it needs to generate different forms based on node type.
+
+```typescript
+import { NodeDefinition } from '@/core/workflow/types';
+import { NODE_REGISTRY } from '@/core/workflow/nodes/registry';
+
+interface NodeConfigFormProps {
+  workflowId: string;
+  node: NodeDefinition;
+}
+
+export function NodeConfigForm({ workflowId, node }: NodeConfigFormProps) {
+  const updateNodeConfig = useWorkflowStore(
+    (state) => state.updateNodeConfig
+  );
+  
+  const nodeMetadata = NODE_REGISTRY[node.type];
+  
+  if (!nodeMetadata) {
+    return <div>Unknown node type: {node.type}</div>;
+  }
+  
+  const handleFieldChange = (fieldPath: string, value: any) => {
+    updateNodeConfig(workflowId, node.id, fieldPath, value);
+  };
+  
+  return (
+    <div className="space-y-4">
+      {/* Node Name */}
+      <FormField
+        label="Node Name"
+        value={node.name}
+        onChange={(value) => handleFieldChange('name', value)}
+      />
+      
+      {/* Dynamic fields based on node type */}
+      {nodeMetadata.configFields.map((field) => (
+        <DynamicFormField
+          key={field.path}
+          field={field}
+          value={getNestedValue(node.config, field.path)}
+          onChange={(value) => handleFieldChange(field.path, value)}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+#### Step 3: Define Config Field Metadata
+
+**File:** `src/core/workflow/nodes/registry.ts`
+
+Update the registry to include form field definitions:
+
+```typescript
+export interface ConfigFieldDefinition {
+  path: string; // e.g., 'apiKey' or 'options.temperature'
+  label: string;
+  type: 'text' | 'number' | 'select' | 'textarea' | 'boolean' | 'secret';
+  required?: boolean;
+  placeholder?: string;
+  description?: string;
+  options?: Array<{ label: string; value: any }>; // For select fields
+  min?: number; // For number fields
+  max?: number;
+  rows?: number; // For textarea
+}
+
+export interface NodeMetadata {
+  type: string;
+  category: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  configFields: ConfigFieldDefinition[]; // NEW
+}
+
+// Example for groqCompletion node:
+export const NODE_REGISTRY: Record<string, NodeMetadata> = {
+  groqCompletion: {
+    type: 'groqCompletion',
+    category: 'llm',
+    name: 'Groq Completion',
+    description: 'Call Groq LLM API',
+    icon: 'Zap',
+    color: 'orange',
+    configFields: [
+      {
+        path: 'apiKey',
+        label: 'API Key',
+        type: 'secret',
+        required: true,
+        description: 'Your Groq API key (stored securely)',
+      },
+      {
+        path: 'model',
+        label: 'Model',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Llama 3.1 70B', value: 'llama-3.1-70b-versatile' },
+          { label: 'Llama 3.1 8B', value: 'llama-3.1-8b-instant' },
+          { label: 'Mixtral 8x7B', value: 'mixtral-8x7b-32768' },
+        ],
+      },
+      {
+        path: 'prompt',
+        label: 'Prompt',
+        type: 'textarea',
+        required: true,
+        rows: 6,
+        placeholder: 'Enter your prompt here...',
+        description: 'Supports {{variable}} interpolation',
+      },
+      {
+        path: 'temperature',
+        label: 'Temperature',
+        type: 'number',
+        min: 0,
+        max: 2,
+        placeholder: '0.7',
+        description: 'Controls randomness (0-2)',
+      },
+      {
+        path: 'maxTokens',
+        label: 'Max Tokens',
+        type: 'number',
+        min: 1,
+        max: 32768,
+        placeholder: '1000',
+      },
+      {
+        path: 'stream',
+        label: 'Enable Streaming',
+        type: 'boolean',
+        description: 'Stream response chunks as they arrive',
+      },
+    ],
+  },
+  
+  // Similar for all other node types...
+};
+```
+
+#### Step 4: Create Dynamic Form Field Components
+
+**File:** `src/renderer/components/WorkflowCanvas/form-fields/DynamicFormField.tsx`
+
+```typescript
+import { ConfigFieldDefinition } from '@/core/workflow/nodes/registry';
+import { TextInput } from './TextInput';
+import { NumberInput } from './NumberInput';
+import { SelectInput } from './SelectInput';
+import { TextareaInput } from './TextareaInput';
+import { BooleanInput } from './BooleanInput';
+import { SecretInput } from './SecretInput';
+
+interface DynamicFormFieldProps {
+  field: ConfigFieldDefinition;
+  value: any;
+  onChange: (value: any) => void;
+}
+
+export function DynamicFormField({ 
+  field, 
+  value, 
+  onChange 
+}: DynamicFormFieldProps) {
+  switch (field.type) {
+    case 'text':
+      return <TextInput field={field} value={value} onChange={onChange} />;
+    
+    case 'number':
+      return <NumberInput field={field} value={value} onChange={onChange} />;
+    
+    case 'select':
+      return <SelectInput field={field} value={value} onChange={onChange} />;
+    
+    case 'textarea':
+      return <TextareaInput field={field} value={value} onChange={onChange} />;
+    
+    case 'boolean':
+      return <BooleanInput field={field} value={value} onChange={onChange} />;
+    
+    case 'secret':
+      return <SecretInput field={field} value={value} onChange={onChange} />;
+    
+    default:
+      return <div>Unknown field type: {field.type}</div>;
+  }
+}
+```
+
+#### Step 5: Implement Individual Input Components
+
+**File:** `src/renderer/components/WorkflowCanvas/form-fields/TextInput.tsx`
+
+```typescript
+import { ConfigFieldDefinition } from '@/core/workflow/nodes/registry';
+
+interface TextInputProps {
+  field: ConfigFieldDefinition;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export function TextInput({ field, value, onChange }: TextInputProps) {
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-gray-700">
+        {field.label}
+        {field.required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      
+      <input
+        type="text"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.placeholder}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md 
+                   focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      />
+      
+      {field.description && (
+        <p className="text-xs text-gray-500">{field.description}</p>
+      )}
+    </div>
+  );
+}
+```
+
+Create similar components for:
+- `NumberInput.tsx` - with min/max validation
+- `SelectInput.tsx` - dropdown with options
+- `TextareaInput.tsx` - multi-line text with row count
+- `BooleanInput.tsx` - checkbox or toggle
+- `SecretInput.tsx` - password-style input with encryption
+
+#### Step 6: Update Workflow Store with Config Updates
+
+**File:** `src/renderer/store/workflowStore.ts`
+
+Add a new action:
+
+```typescript
+interface WorkflowStore {
+  // ... existing state
+  
+  // NEW ACTION
+  updateNodeConfig: (
+    workflowId: string, 
+    nodeId: string, 
+    fieldPath: string, 
+    value: any
+  ) => void;
+}
+
+export const useWorkflowStore = create<WorkflowStore>((set) => ({
+  // ... existing state
+  
+  updateNodeConfig: (workflowId, nodeId, fieldPath, value) => {
+    set((state) => {
+      const workflow = state.workflows[workflowId];
+      if (!workflow) return state;
+      
+      const node = workflow.nodes[nodeId];
+      if (!node) return state;
+      
+      // Handle nested paths like 'options.temperature'
+      const pathParts = fieldPath.split('.');
+      const updatedNode = { ...node };
+      
+      if (pathParts.length === 1) {
+        // Simple field like 'name' or 'apiKey'
+        if (pathParts[0] === 'name') {
+          updatedNode.name = value;
+        } else {
+          updatedNode.config = {
+            ...updatedNode.config,
+            [pathParts[0]]: value,
+          };
+        }
+      } else {
+        // Nested field like 'options.temperature'
+        const nestedConfig = { ...updatedNode.config };
+        let current: any = nestedConfig;
+        
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          current[pathParts[i]] = { ...current[pathParts[i]] };
+          current = current[pathParts[i]];
+        }
+        
+        current[pathParts[pathParts.length - 1]] = value;
+        updatedNode.config = nestedConfig;
+      }
+      
+      return {
+        workflows: {
+          ...state.workflows,
+          [workflowId]: {
+            ...workflow,
+            nodes: {
+              ...workflow.nodes,
+              [nodeId]: updatedNode,
+            },
+          },
+        },
+      };
+    });
+  },
+}));
+```
+
+#### Step 7: Integrate with Canvas
+
+**File:** `src/renderer/components/WorkflowCanvas/WorkflowCanvas.tsx`
+
+Add state for selected node and connect to properties panel:
+
+```typescript
+export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  
+  // ... existing code
+  
+  const onNodeClick = useCallback((event: any, node: any) => {
+    setSelectedNodeId(node.id);
+  }, []);
+  
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeId(null); // Deselect when clicking canvas
+  }, []);
+  
+  return (
+    <div className="flex h-full">
+      {/* Canvas */}
+      <div className="flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          nodeTypes={nodeTypes}
+          fitView
+        >
+          <Background />
+          <Controls />
+          <MiniMap />
+        </ReactFlow>
+      </div>
+      
+      {/* Properties Panel */}
+      <div className="w-80 border-l border-gray-200">
+        <WorkflowPropertiesPanel 
+          workflowId={workflowId}
+          selectedNodeId={selectedNodeId}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+### Success Criteria
+
+- [ ] Clicking a node shows its config in right panel
+- [ ] All node types have config fields defined in registry
+- [ ] Text, number, select, textarea, boolean, and secret inputs all work
+- [ ] Changes to config immediately update the workflow store
+- [ ] Required field validation shows errors
+- [ ] Clicking canvas background deselects node
+- [ ] Properties panel shows empty state when nothing selected
+
+### Testing Plan
+
+1. **Manual Testing:**
+   - Click each node type and verify correct fields appear
+   - Edit each field type and verify changes persist
+   - Try invalid values (e.g., text in number field)
+   - Verify required field validation
+
+2. **Automated Testing:**
+   ```typescript
+   // tests/properties-panel.test.tsx
+   describe('WorkflowPropertiesPanel', () => {
+     it('should display node config when node selected', () => {
+       // Test implementation
+     });
+     
+     it('should update config when field changes', () => {
+       // Test implementation
+     });
+     
+     it('should show validation errors for required fields', () => {
+       // Test implementation
+     });
+   });
+   ```
+
+### Files to Create
+
+- `src/renderer/components/WorkflowCanvas/WorkflowPropertiesPanel.tsx`
+- `src/renderer/components/WorkflowCanvas/NodeConfigForm.tsx`
+- `src/renderer/components/WorkflowCanvas/form-fields/DynamicFormField.tsx`
+- `src/renderer/components/WorkflowCanvas/form-fields/TextInput.tsx`
+- `src/renderer/components/WorkflowCanvas/form-fields/NumberInput.tsx`
+- `src/renderer/components/WorkflowCanvas/form-fields/SelectInput.tsx`
+- `src/renderer/components/WorkflowCanvas/form-fields/TextareaInput.tsx`
+- `src/renderer/components/WorkflowCanvas/form-fields/BooleanInput.tsx`
+- `src/renderer/components/WorkflowCanvas/form-fields/SecretInput.tsx`
+- `tests/properties-panel.test.tsx`
+
+### Files to Modify
+
+- `src/core/workflow/nodes/registry.ts` - Add configFields to all nodes
+- `src/renderer/store/workflowStore.ts` - Add updateNodeConfig action
+- `src/renderer/components/WorkflowCanvas/WorkflowCanvas.tsx` - Integrate panel
+
+---
+
+## Task 2.11: Execution Logging System
+
+**Duration:** 1-2 days  
+**Confidence:** 8/10  
+**Priority:** HIGH - Foundation for testing features
+
+### Problem Statement
+
+Currently, when you generate and run Python code, there's no record of:
+- What data was sent to the workflow
+- What each node outputted
+- How long execution took
+- What errors occurred
+
+You can't learn from past executions or replay them for debugging.
+
+### User Story
+
+As a workflow builder, I want to:
+1. See a history of all workflow executions
+2. View the inputs and outputs for each execution
+3. Understand which executions succeeded vs failed
+4. Replay past executions for debugging
+
+### Implementation Plan
+
+#### Step 1: Define Execution Schema
+
+**File:** `src/core/execution/types.ts`
+
+```typescript
+export interface WorkflowExecution {
+  id: string; // UUID
+  workflowId: string;
+  workflowName: string;
+  status: 'running' | 'success' | 'error';
+  startedAt: string; // ISO timestamp
+  completedAt?: string;
+  durationMs?: number;
+  trigger: {
+    type: string; // 'http', 'manual', 'scheduled'
+    data: any; // The input data
+  };
+  nodeExecutions: NodeExecution[];
+  error?: {
+    message: string;
+    stack?: string;
+    nodeId?: string; // Which node failed
+  };
+}
+
+export interface NodeExecution {
+  nodeId: string;
+  nodeName: string;
+  nodeType: string;
+  status: 'pending' | 'running' | 'success' | 'error' | 'skipped';
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
+  input: any; // Data that came into this node
+  output?: any; // Data that came out
+  error?: {
+    message: string;
+    stack?: string;
+  };
+}
+```
+
+#### Step 2: Create SQLite Database Manager
+
+**File:** `electron/execution-logger.ts`
+
+```typescript
+import Database from 'better-sqlite3';
+import path from 'path';
+import { app } from 'electron';
+import { WorkflowExecution } from '@/core/execution/types';
+
+export class ExecutionLogger {
+  private db: Database.Database;
+  
+  constructor() {
+    const dbPath = path.join(app.getPath('userData'), 'executions.db');
+    this.db = new Database(dbPath);
+    this.initializeDatabase();
+  }
+  
+  private initializeDatabase() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS executions (
+        id TEXT PRIMARY KEY,
+        workflow_id TEXT NOT NULL,
+        workflow_name TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        duration_ms INTEGER,
+        trigger_type TEXT NOT NULL,
+        trigger_data TEXT NOT NULL,
+        error_message TEXT,
+        error_stack TEXT,
+        error_node_id TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      
+      CREATE TABLE IF NOT EXISTS node_executions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        execution_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        node_name TEXT NOT NULL,
+        node_type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at TEXT,
+        completed_at TEXT,
+        duration_ms INTEGER,
+        input TEXT,
+        output TEXT,
+        error_message TEXT,
+        error_stack TEXT,
+        FOREIGN KEY (execution_id) REFERENCES executions(id)
+      );
+      
+      CREATE INDEX IF NOT EXISTS idx_executions_workflow 
+        ON executions(workflow_id);
+      CREATE INDEX IF NOT EXISTS idx_executions_status 
+        ON executions(status);
+      CREATE INDEX IF NOT EXISTS idx_executions_started 
+        ON executions(started_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_node_executions_execution 
+        ON node_executions(execution_id);
+    `);
+  }
+  
+  public logExecution(execution: WorkflowExecution): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO executions (
+        id, workflow_id, workflow_name, status, started_at, 
+        completed_at, duration_ms, trigger_type, trigger_data,
+        error_message, error_stack, error_node_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    stmt.run(
+      execution.id,
+      execution.workflowId,
+      execution.workflowName,
+      execution.status,
+      execution.startedAt,
+      execution.completedAt || null,
+      execution.durationMs || null,
+      execution.trigger.type,
+      JSON.stringify(execution.trigger.data),
+      execution.error?.message || null,
+      execution.error?.stack || null,
+      execution.error?.nodeId || null
+    );
+    
+    // Log node executions
+    if (execution.nodeExecutions.length > 0) {
+      const nodeStmt = this.db.prepare(`
+        INSERT INTO node_executions (
+          execution_id, node_id, node_name, node_type, status,
+          started_at, completed_at, duration_ms, input, output,
+          error_message, error_stack
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const nodeExec of execution.nodeExecutions) {
+        nodeStmt.run(
+          execution.id,
+          nodeExec.nodeId,
+          nodeExec.nodeName,
+          nodeExec.nodeType,
+          nodeExec.status,
+          nodeExec.startedAt || null,
+          nodeExec.completedAt || null,
+          nodeExec.durationMs || null,
+          JSON.stringify(nodeExec.input),
+          nodeExec.output ? JSON.stringify(nodeExec.output) : null,
+          nodeExec.error?.message || null,
+          nodeExec.error?.stack || null
+        );
+      }
+    }
+  }
+  
+  public getExecutions(
+    workflowId: string,
+    limit = 50,
+    offset = 0
+  ): WorkflowExecution[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM executions 
+      WHERE workflow_id = ?
+      ORDER BY started_at DESC
+      LIMIT ? OFFSET ?
+    `);
+    
+    const rows = stmt.all(workflowId, limit, offset) as any[];
+    
+    return rows.map((row) => this.rowToExecution(row));
+  }
+  
+  public getExecution(executionId: string): WorkflowExecution | null {
+    const stmt = this.db.prepare(`
+      SELECT * FROM executions WHERE id = ?
+    `);
+    
+    const row = stmt.get(executionId) as any;
+    if (!row) return null;
+    
+    return this.rowToExecution(row);
+  }
+  
+  private rowToExecution(row: any): WorkflowExecution {
+    const nodeStmt = this.db.prepare(`
+      SELECT * FROM node_executions 
+      WHERE execution_id = ?
+      ORDER BY id ASC
+    `);
+    
+    const nodeRows = nodeStmt.all(row.id) as any[];
+    
+    return {
+      id: row.id,
+      workflowId: row.workflow_id,
+      workflowName: row.workflow_name,
+      status: row.status,
+      startedAt: row.started_at,
+      completedAt: row.completed_at || undefined,
+      durationMs: row.duration_ms || undefined,
+      trigger: {
+        type: row.trigger_type,
+        data: JSON.parse(row.trigger_data),
+      },
+      nodeExecutions: nodeRows.map((nodeRow) => ({
+        nodeId: nodeRow.node_id,
+        nodeName: nodeRow.node_name,
+        nodeType: nodeRow.node_type,
+        status: nodeRow.status,
+        startedAt: nodeRow.started_at || undefined,
+        completedAt: nodeRow.completed_at || undefined,
+        durationMs: nodeRow.duration_ms || undefined,
+        input: JSON.parse(nodeRow.input),
+        output: nodeRow.output ? JSON.parse(nodeRow.output) : undefined,
+        error: nodeRow.error_message
+          ? {
+              message: nodeRow.error_message,
+              stack: nodeRow.error_stack || undefined,
+            }
+          : undefined,
+      })),
+      error: row.error_message
+        ? {
+            message: row.error_message,
+            stack: row.error_stack || undefined,
+            nodeId: row.error_node_id || undefined,
+          }
+        : undefined,
+    };
+  }
+  
+  public deleteExecution(executionId: string): void {
+    this.db.prepare('DELETE FROM node_executions WHERE execution_id = ?')
+      .run(executionId);
+    this.db.prepare('DELETE FROM executions WHERE id = ?')
+      .run(executionId);
+  }
+  
+  public clearWorkflowExecutions(workflowId: string): void {
+    const executions = this.db.prepare(`
+      SELECT id FROM executions WHERE workflow_id = ?
+    `).all(workflowId) as Array<{ id: string }>;
+    
+    for (const exec of executions) {
+      this.deleteExecution(exec.id);
+    }
+  }
+}
+
+// Singleton instance
+export const executionLogger = new ExecutionLogger();
+```
+
+#### Step 3: Add IPC Handlers for Execution History
+
+**File:** `electron/execution-handlers.ts`
+
+```typescript
+import { ipcMain } from 'electron';
+import { executionLogger } from './execution-logger';
+
+export function registerExecutionHandlers() {
+  ipcMain.handle('execution:get-history', async (event, workflowId: string) => {
+    return executionLogger.getExecutions(workflowId, 50, 0);
+  });
+  
+  ipcMain.handle('execution:get-details', async (event, executionId: string) => {
+    return executionLogger.getExecution(executionId);
+  });
+  
+  ipcMain.handle('execution:delete', async (event, executionId: string) => {
+    executionLogger.deleteExecution(executionId);
+    return { success: true };
+  });
+  
+  ipcMain.handle('execution:clear-workflow', async (event, workflowId: string) => {
+    executionLogger.clearWorkflowExecutions(workflowId);
+    return { success: true };
+  });
+}
+```
+
+#### Step 4: Update Generated Python to Log Executions
+
+**File:** `src/core/codegen/python/templates/main.py.template`
+
+Add execution logging to generated Python:
+
+```python
+import httpx
+from datetime import datetime
+import uuid
+
+# Add logging endpoint
+CATALYST_EDITOR_URL = os.getenv('CATALYST_EDITOR_URL', 'http://localhost:3000')
+
+async def log_execution(execution_data: dict):
+    """Send execution data back to Catalyst editor"""
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{CATALYST_EDITOR_URL}/api/executions",
+                json=execution_data,
+                timeout=2.0
+            )
+    except Exception as e:
+        # Don't fail workflow if logging fails
+        print(f"Failed to log execution: {e}")
+
+# Wrap workflow execution
+@app.post("/api/{{workflow_name}}")
+async def workflow_{{workflow_name}}(request: Request):
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.utcnow().isoformat()
+    
+    execution_data = {
+        "id": execution_id,
+        "workflowId": "{{workflow_id}}",
+        "workflowName": "{{workflow_name}}",
+        "status": "running",
+        "startedAt": started_at,
+        "trigger": {
+            "type": "http",
+            "data": await request.json()
+        },
+        "nodeExecutions": []
+    }
+    
+    try:
+        # Run workflow
+        result = await execute_workflow(request, execution_data)
+        
+        # Log success
+        execution_data["status"] = "success"
+        execution_data["completedAt"] = datetime.utcnow().isoformat()
+        execution_data["durationMs"] = int(
+            (datetime.fromisoformat(execution_data["completedAt"]) - 
+             datetime.fromisoformat(started_at)).total_seconds() * 1000
+        )
+        await log_execution(execution_data)
+        
+        return result
+        
+    except Exception as e:
+        # Log error
+        execution_data["status"] = "error"
+        execution_data["completedAt"] = datetime.utcnow().isoformat()
+        execution_data["error"] = {
+            "message": str(e),
+            "stack": traceback.format_exc()
+        }
+        await log_execution(execution_data)
+        raise
+```
+
+#### Step 5: Create Execution Receiver in Electron
+
+**File:** `electron/execution-receiver.ts`
+
+```typescript
+import express from 'express';
+import { executionLogger } from './execution-logger';
+import { WorkflowExecution } from '@/core/execution/types';
+
+const app = express();
+app.use(express.json());
+
+// Receive execution logs from generated Python code
+app.post('/api/executions', (req, res) => {
+  try {
+    const execution = req.body as WorkflowExecution;
+    executionLogger.logExecution(execution);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to log execution:', error);
+    res.status(500).json({ error: 'Failed to log execution' });
+  }
+});
+
+export function startExecutionReceiver() {
+  const PORT = 3000; // TODO: Make configurable
+  app.listen(PORT, () => {
+    console.log(`Execution receiver listening on port ${PORT}`);
+  });
+}
+```
+
+### Success Criteria
+
+- [ ] SQLite database created with proper schema
+- [ ] Executions logged with all relevant data
+- [ ] Node-level execution data captured
+- [ ] IPC handlers return execution history
+- [ ] Generated Python sends execution data back to editor
+- [ ] Execution receiver endpoint working
+
+### Testing Plan
+
+1. **Database Testing:**
+   ```typescript
+   describe('ExecutionLogger', () => {
+     it('should create executions table', () => {});
+     it('should insert execution records', () => {});
+     it('should retrieve execution history', () => {});
+     it('should delete executions', () => {});
+   });
+   ```
+
+2. **Integration Testing:**
+   - Generate workflow with logging
+   - Run workflow via HTTP
+   - Verify execution appears in database
+   - Verify node executions captured
+
+### Files to Create
+
+- `src/core/execution/types.ts`
+- `electron/execution-logger.ts`
+- `electron/execution-handlers.ts`
+- `electron/execution-receiver.ts`
+- `tests/execution-logger.test.ts`
+
+### Files to Modify
+
+- `src/core/codegen/python/templates/main.py.template` - Add logging
+- `electron/main.ts` - Start execution receiver
+
+---
+
+## Task 2.12: Execution History Viewer UI
+
+**Duration:** 1-2 days  
+**Confidence:** 8/10  
+**Priority:** HIGH - Makes execution history useful
+
+### Problem Statement
+
+You have execution data in the database, but no way to view it. Need a UI to:
+- List past executions
+- Filter by status (success/error)
+- View detailed execution data
+- Inspect node-by-node execution
+
+### User Story
+
+As a workflow builder, I want to:
+1. See a list of recent workflow executions
+2. Click an execution to see detailed node-by-node data
+3. Filter executions by success/failure
+4. Delete old executions
+
+### Implementation Plan
+
+#### Step 1: Create Execution History Panel
+
+**File:** `src/renderer/components/ExecutionHistory/ExecutionHistoryPanel.tsx`
+
+```typescript
+import React, { useEffect, useState } from 'react';
+import { WorkflowExecution } from '@/core/execution/types';
+
+interface ExecutionHistoryPanelProps {
+  workflowId: string;
+}
+
+export function ExecutionHistoryPanel({ workflowId }: ExecutionHistoryPanelProps) {
+  const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
+  const [selectedExecution, setSelectedExecution] = useState<WorkflowExecution | null>(null);
+  const [filter, setFilter] = useState<'all' | 'success' | 'error'>('all');
+  
+  useEffect(() => {
+    loadExecutions();
+  }, [workflowId]);
+  
+  const loadExecutions = async () => {
+    const result = await window.electronAPI.execution.getHistory(workflowId);
+    setExecutions(result);
+  };
+  
+  const filteredExecutions = executions.filter((exec) => {
+    if (filter === 'all') return true;
+    return exec.status === filter;
+  });
+  
+  return (
+    <div className="h-full flex">
+      {/* Execution List */}
+      <div className="w-80 border-r border-gray-200 flex flex-col">
+        <ExecutionListHeader 
+          filter={filter} 
+          onFilterChange={setFilter}
+          onRefresh={loadExecutions}
+        />
+        
+        <div className="flex-1 overflow-y-auto">
+          {filteredExecutions.map((execution) => (
+            <ExecutionListItem
+              key={execution.id}
+              execution={execution}
+              isSelected={selectedExecution?.id === execution.id}
+              onClick={() => setSelectedExecution(execution)}
+            />
+          ))}
+          
+          {filteredExecutions.length === 0 && (
+            <div className="p-4 text-center text-gray-500">
+              No executions found
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Execution Details */}
+      <div className="flex-1">
+        {selectedExecution ? (
+          <ExecutionDetails execution={selectedExecution} />
+        ) : (
+          <EmptyState />
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+#### Step 2: Create Execution List Item
+
+**File:** `src/renderer/components/ExecutionHistory/ExecutionListItem.tsx`
+
+```typescript
+import { WorkflowExecution } from '@/core/execution/types';
+import { formatDistanceToNow } from 'date-fns';
+import { CheckCircle, XCircle, Clock } from 'lucide-react';
+
+interface ExecutionListItemProps {
+  execution: WorkflowExecution;
+  isSelected: boolean;
+  onClick: () => void;
+}
+
+export function ExecutionListItem({ 
+  execution, 
+  isSelected, 
+  onClick 
+}: ExecutionListItemProps) {
+  const statusIcon = {
+    success: <CheckCircle className="w-5 h-5 text-green-500" />,
+    error: <XCircle className="w-5 h-5 text-red-500" />,
+    running: <Clock className="w-5 h-5 text-blue-500 animate-spin" />,
+  }[execution.status];
+  
+  const timeAgo = formatDistanceToNow(new Date(execution.startedAt), {
+    addSuffix: true,
+  });
+  
+  return (
+    <div
+      onClick={onClick}
+      className={`
+        p-3 border-b border-gray-200 cursor-pointer
+        hover:bg-gray-50 transition-colors
+        ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}
+      `}
+    >
+      <div className="flex items-start gap-3">
+        {statusIcon}
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium text-sm truncate">
+              {execution.trigger.type === 'http' ? 'HTTP Request' : 'Manual'}
+            </span>
+            {execution.durationMs && (
+              <span className="text-xs text-gray-500">
+                {execution.durationMs}ms
+              </span>
+            )}
+          </div>
+          
+          <div className="text-xs text-gray-500 mt-1">
+            {timeAgo}
+          </div>
+          
+          {execution.status === 'error' && execution.error && (
+            <div className="text-xs text-red-600 mt-1 truncate">
+              {execution.error.message}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+#### Step 3: Create Execution Details View
+
+**File:** `src/renderer/components/ExecutionHistory/ExecutionDetails.tsx`
+
+```typescript
+import { WorkflowExecution } from '@/core/execution/types';
+import { ExecutionTimeline } from './ExecutionTimeline';
+import { ExecutionData } from './ExecutionData';
+
+interface ExecutionDetailsProps {
+  execution: WorkflowExecution;
+}
+
+export function ExecutionDetails({ execution }: ExecutionDetailsProps) {
+  const [activeTab, setActiveTab] = useState<'timeline' | 'data'>('timeline');
+  
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">
+              Execution {execution.id.slice(0, 8)}
+            </h2>
+            <p className="text-sm text-gray-500">
+              {new Date(execution.startedAt).toLocaleString()}
+            </p>
+          </div>
+          
+          <ExecutionActions execution={execution} />
+        </div>
+      </div>
+      
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('timeline')}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'timeline'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500'
+          }`}
+        >
+          Timeline
+        </button>
+        <button
+          onClick={() => setActiveTab('data')}
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'data'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500'
+          }`}
+        >
+          Data
+        </button>
+      </div>
+      
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {activeTab === 'timeline' ? (
+          <ExecutionTimeline execution={execution} />
+        ) : (
+          <ExecutionData execution={execution} />
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+#### Step 4: Create Execution Timeline
+
+**File:** `src/renderer/components/ExecutionHistory/ExecutionTimeline.tsx`
+
+```typescript
+import { WorkflowExecution, NodeExecution } from '@/core/execution/types';
+import { CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+
+export function ExecutionTimeline({ execution }: { execution: WorkflowExecution }) {
+  return (
+    <div className="space-y-4">
+      {/* Trigger */}
+      <TimelineItem
+        icon={<Clock className="w-4 h-4" />}
+        title="Workflow Triggered"
+        subtitle={`via ${execution.trigger.type}`}
+        timestamp={execution.startedAt}
+        status="success"
+      />
+      
+      {/* Node Executions */}
+      {execution.nodeExecutions.map((nodeExec, index) => (
+        <NodeTimelineItem
+          key={index}
+          nodeExecution={nodeExec}
+        />
+      ))}
+      
+      {/* Completion or Error */}
+      {execution.status === 'success' && (
+        <TimelineItem
+          icon={<CheckCircle className="w-4 h-4" />}
+          title="Workflow Completed"
+          subtitle={`in ${execution.durationMs}ms`}
+          timestamp={execution.completedAt!}
+          status="success"
+        />
+      )}
+      
+      {execution.status === 'error' && (
+        <TimelineItem
+          icon={<XCircle className="w-4 h-4" />}
+          title="Workflow Failed"
+          subtitle={execution.error?.message}
+          timestamp={execution.completedAt!}
+          status="error"
+        />
+      )}
+    </div>
+  );
+}
+
+function NodeTimelineItem({ nodeExecution }: { nodeExecution: NodeExecution }) {
+  const [expanded, setExpanded] = useState(false);
+  
+  return (
+    <div className="relative">
+      {/* Timeline line */}
+      <div className="absolute left-2 top-6 bottom-0 w-px bg-gray-200" />
+      
+      <div 
+        className="relative flex items-start gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded"
+        onClick={() => setExpanded(!expanded)}
+      >
+        {/* Status icon */}
+        <div className={`
+          w-4 h-4 rounded-full flex items-center justify-center
+          ${nodeExecution.status === 'success' ? 'bg-green-500' : ''}
+          ${nodeExecution.status === 'error' ? 'bg-red-500' : ''}
+          ${nodeExecution.status === 'running' ? 'bg-blue-500' : ''}
+        `}>
+          {nodeExecution.status === 'success' && (
+            <CheckCircle className="w-3 h-3 text-white" />
+          )}
+          {nodeExecution.status === 'error' && (
+            <XCircle className="w-3 h-3 text-white" />
+          )}
+        </div>
+        
+        {/* Node info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-sm">
+              {nodeExecution.nodeName}
+            </span>
+            {nodeExecution.durationMs && (
+              <span className="text-xs text-gray-500">
+                {nodeExecution.durationMs}ms
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-gray-500">
+            {nodeExecution.nodeType}
+          </div>
+        </div>
+      </div>
+      
+      {/* Expanded details */}
+      {expanded && (
+        <div className="ml-7 mt-2 space-y-2">
+          <DataBlock title="Input" data={nodeExecution.input} />
+          {nodeExecution.output && (
+            <DataBlock title="Output" data={nodeExecution.output} />
+          )}
+          {nodeExecution.error && (
+            <ErrorBlock error={nodeExecution.error} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Success Criteria
+
+- [ ] Execution list displays all executions
+- [ ] Filter by status works (all/success/error)
+- [ ] Clicking execution shows details
+- [ ] Timeline view shows node-by-node execution
+- [ ] Can expand nodes to see input/output
+- [ ] Error details displayed for failed executions
+- [ ] Refresh button updates list
+- [ ] Delete execution works
+
+### Files to Create
+
+- `src/renderer/components/ExecutionHistory/ExecutionHistoryPanel.tsx`
+- `src/renderer/components/ExecutionHistory/ExecutionListItem.tsx`
+- `src/renderer/components/ExecutionHistory/ExecutionDetails.tsx`
+- `src/renderer/components/ExecutionHistory/ExecutionTimeline.tsx`
+- `src/renderer/components/ExecutionHistory/ExecutionData.tsx`
+
+---
+
+## Task 2.13: Node Data Pinning System
+
+**Duration:** 1 day  
+**Confidence:** 8/10  
+**Priority:** HIGH - Critical for testing workflows
+
+### Problem Statement
+
+In n8n, you can "pin" JSON data to a node for testing. This lets you:
+- Test individual nodes without running the entire workflow
+- Use sample data for development
+- Replay specific scenarios
+
+Catalyst needs this capability.
+
+### User Story
+
+As a workflow builder, I want to:
+1. Right-click a node and select "Pin Data"
+2. Paste or edit JSON directly
+3. Have the workflow use pinned data instead of live data
+4. Easily unpin data when done testing
+
+### Implementation Plan
+
+#### Step 1: Add Pinned Data to Node Schema
+
+**File:** `src/core/workflow/types.ts`
+
+```typescript
+export interface NodeDefinition {
+  id: string;
+  type: string;
+  name: string;
+  position: { x: number; y: number };
+  config: Record<string, any>;
+  
+  // NEW: Pinned data for testing
+  pinnedData?: {
+    enabled: boolean;
+    data: any; // The JSON data to use
+    timestamp: string; // When it was pinned
+  };
+}
+```
+
+#### Step 2: Add Pinning UI to Node Context Menu
+
+**File:** `src/renderer/components/WorkflowCanvas/NodeContextMenu.tsx`
+
+```typescript
+import { Pin, PinOff, Trash2 } from 'lucide-react';
+
+interface NodeContextMenuProps {
+  nodeId: string;
+  workflowId: string;
+  position: { x: number; y: number };
+  onClose: () => void;
+}
+
+export function NodeContextMenu({ 
+  nodeId, 
+  workflowId, 
+  position, 
+  onClose 
+}: NodeContextMenuProps) {
+  const node = useWorkflowStore((state) => 
+    state.workflows[workflowId]?.nodes[nodeId]
+  );
+  
+  const { pinNodeData, unpinNodeData, deleteNode } = useWorkflowStore();
+  
+  const handlePinData = () => {
+    // Open pin data modal
+    setShowPinDataModal(true);
+    onClose();
+  };
+  
+  const handleUnpin = () => {
+    unpinNodeData(workflowId, nodeId);
+    onClose();
+  };
+  
+  const hasPinnedData = node?.pinnedData?.enabled;
+  
+  return (
+    <div 
+      className="absolute bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-48"
+      style={{ left: position.x, top: position.y }}
+    >
+      {hasPinnedData ? (
+        <MenuItem
+          icon={<PinOff className="w-4 h-4" />}
+          label="Unpin Data"
+          onClick={handleUnpin}
+        />
+      ) : (
+        <MenuItem
+          icon={<Pin className="w-4 h-4" />}
+          label="Pin Data"
+          onClick={handlePinData}
+        />
+      )}
+      
+      <div className="border-t border-gray-200 my-1" />
+      
+      <MenuItem
+        icon={<Trash2 className="w-4 h-4 text-red-500" />}
+        label="Delete Node"
+        onClick={() => {
+          deleteNode(workflowId, nodeId);
+          onClose();
+        }}
+        className="text-red-600 hover:bg-red-50"
+      />
+    </div>
+  );
+}
+```
+
+#### Step 3: Create Pin Data Modal
+
+**File:** `src/renderer/components/WorkflowCanvas/PinDataModal.tsx`
+
+```typescript
+import { useState } from 'react';
+import { useWorkflowStore } from '@/renderer/store/workflowStore';
+import CodeEditor from '@monaco-editor/react';
+
+interface PinDataModalProps {
+  workflowId: string;
+  nodeId: string;
+  onClose: () => void;
+}
+
+export function PinDataModal({ 
+  workflowId, 
+  nodeId, 
+  onClose 
+}: PinDataModalProps) {
+  const node = useWorkflowStore((state) => 
+    state.workflows[workflowId]?.nodes[nodeId]
+  );
+  
+  const [jsonText, setJsonText] = useState(
+    node?.pinnedData?.data 
+      ? JSON.stringify(node.pinnedData.data, null, 2)
+      : '{\n  \n}'
+  );
+  
+  const [error, setError] = useState<string | null>(null);
+  
+  const { pinNodeData } = useWorkflowStore();
+  
+  const handleSave = () => {
+    try {
+      const parsed = JSON.parse(jsonText);
+      pinNodeData(workflowId, nodeId, parsed);
+      onClose();
+    } catch (err) {
+      setError('Invalid JSON: ' + (err as Error).message);
+    }
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold">Pin Data: {node?.name}</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            This data will be used instead of live data from previous nodes
+          </p>
+        </div>
+        
+        {/* Editor */}
+        <div className="flex-1 p-4">
+          <CodeEditor
+            height="400px"
+            language="json"
+            value={jsonText}
+            onChange={(value) => {
+              setJsonText(value || '');
+              setError(null);
+            }}
+            options={{
+              minimap: { enabled: false },
+              lineNumbers: 'on',
+              scrollBeyondLastLine: false,
+              fontSize: 14,
+            }}
+          />
+          
+          {error && (
+            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+              {error}
+            </div>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Pin Data
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+#### Step 4: Update Workflow Store with Pinning Actions
+
+**File:** `src/renderer/store/workflowStore.ts`
+
+```typescript
+interface WorkflowStore {
+  // ... existing
+  
+  pinNodeData: (workflowId: string, nodeId: string, data: any) => void;
+  unpinNodeData: (workflowId: string, nodeId: string) => void;
+}
+
+export const useWorkflowStore = create<WorkflowStore>((set) => ({
+  // ... existing
+  
+  pinNodeData: (workflowId, nodeId, data) => {
+    set((state) => {
+      const workflow = state.workflows[workflowId];
+      if (!workflow) return state;
+      
+      const node = workflow.nodes[nodeId];
+      if (!node) return state;
+      
+      return {
+        workflows: {
+          ...state.workflows,
+          [workflowId]: {
+            ...workflow,
+            nodes: {
+              ...workflow.nodes,
+              [nodeId]: {
+                ...node,
+                pinnedData: {
+                  enabled: true,
+                  data,
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            },
+          },
+        },
+      };
+    });
+  },
+  
+  unpinNodeData: (workflowId, nodeId) => {
+    set((state) => {
+      const workflow = state.workflows[workflowId];
+      if (!workflow) return state;
+      
+      const node = workflow.nodes[nodeId];
+      if (!node) return state;
+      
+      return {
+        workflows: {
+          ...state.workflows,
+          [workflowId]: {
+            ...workflow,
+            nodes: {
+              ...workflow.nodes,
+              [nodeId]: {
+                ...node,
+                pinnedData: undefined,
+              },
+            },
+          },
+        },
+      };
+    });
+  },
+}));
+```
+
+#### Step 5: Visual Indicator for Pinned Nodes
+
+**File:** `src/renderer/components/WorkflowCanvas/WorkflowNode.tsx`
+
+Add visual indicator when node has pinned data:
+
+```typescript
+export function WorkflowNode({ data }: { data: NodeDefinition }) {
+  const isPinned = data.pinnedData?.enabled;
+  
+  return (
+    <div className={`
+      relative p-4 bg-white rounded-lg border-2 shadow-md
+      ${isPinned ? 'border-purple-500' : 'border-gray-300'}
+    `}>
+      {isPinned && (
+        <div className="absolute -top-2 -right-2 bg-purple-500 text-white rounded-full p-1">
+          <Pin className="w-3 h-3" />
+        </div>
+      )}
+      
+      {/* ... rest of node UI */}
+    </div>
+  );
+}
+```
+
+#### Step 6: Use Pinned Data in Generated Python
+
+**File:** `src/core/codegen/python/WorkflowOrchestrator.ts`
+
+Modify code generation to use pinned data when available:
+
+```typescript
+private generateNodeFunction(node: NodeDefinition): string {
+  const generator = this.nodeGenerators[node.type];
+  if (!generator) {
+    throw new Error(`No generator for node type: ${node.type}`);
+  }
+  
+  let code = generator.generateFunction(node, this.workflow);
+  
+  // If node has pinned data, wrap function to use it
+  if (node.pinnedData?.enabled) {
+    code += `
+
+# PINNED DATA OVERRIDE
+_original_${node.id} = ${node.id}
+
+async def ${node.id}(context: ExecutionContext) -> Any:
+    """${node.name} - USING PINNED TEST DATA"""
+    # Use pinned data instead of executing
+    pinned_data = ${JSON.stringify(node.pinnedData.data)}
+    context.set_node_output("${node.id}", pinned_data)
+    return pinned_data
+`;
+  }
+  
+  return code;
+}
+```
+
+### Success Criteria
+
+- [ ] Right-click menu shows "Pin Data" option
+- [ ] Pin data modal opens with JSON editor
+- [ ] Invalid JSON shows error message
+- [ ] Valid JSON pins successfully
+- [ ] Pinned nodes show visual indicator (purple border + pin icon)
+- [ ] Generated Python uses pinned data when available
+- [ ] Can unpin data via context menu
+- [ ] Pinned data persists across editor restarts
+
+### Files to Create
+
+- `src/renderer/components/WorkflowCanvas/NodeContextMenu.tsx`
+- `src/renderer/components/WorkflowCanvas/PinDataModal.tsx`
+
+### Files to Modify
+
+- `src/core/workflow/types.ts` - Add pinnedData field
+- `src/renderer/store/workflowStore.ts` - Add pinning actions
+- `src/renderer/components/WorkflowCanvas/WorkflowNode.tsx` - Visual indicator
+- `src/core/codegen/python/WorkflowOrchestrator.ts` - Use pinned data
+
+---
+
+## Task 2.14: Node-by-Node Execution
+
+**Duration:** 2 days  
+**Confidence:** 7/10  
+**Priority:** MEDIUM - Very useful but complex
+
+### Problem Statement
+
+Currently you can only run entire workflows. Need ability to:
+- Execute workflow up to a specific node
+- Step through node-by-node
+- Inspect intermediate outputs
+
+This is like n8n's "Execute to here" feature.
+
+### User Story
+
+As a workflow builder, I want to:
+1. Right-click a node and select "Execute to Here"
+2. See the workflow run up to that node and stop
+3. Inspect the output of that node
+4. Continue to next node manually (step debugging)
+
+### Implementation Plan
+
+#### Step 1: Add "Execute to Here" to Context Menu
+
+**File:** `src/renderer/components/WorkflowCanvas/NodeContextMenu.tsx`
+
+```typescript
+<MenuItem
+  icon={<Play className="w-4 h-4" />}
+  label="Execute to Here"
+  onClick={() => handleExecuteToNode(nodeId)}
+/>
+```
+
+#### Step 2: Generate Partial Workflow Execution
+
+**File:** `src/core/codegen/python/WorkflowOrchestrator.ts`
+
+Add method to generate code that stops at specific node:
+
+```typescript
+public generatePartialWorkflow(
+  targetNodeId: string
+): GeneratedWorkflow {
+  // Find all nodes that come before targetNodeId
+  const reachableNodes = this.findNodesBeforeTarget(targetNodeId);
+  
+  // Generate only those nodes
+  const workflow = { ...this.workflow };
+  workflow.nodes = Object.fromEntries(
+    Object.entries(workflow.nodes).filter(([id]) => 
+      reachableNodes.includes(id) || id === targetNodeId
+    )
+  );
+  
+  // Generate code
+  return this.generatePythonWorkflow();
+}
+
+private findNodesBeforeTarget(targetNodeId: string): string[] {
+  const visited = new Set<string>();
+  const queue: string[] = [];
+  
+  // Find trigger nodes
+  for (const [nodeId, node] of Object.entries(this.workflow.nodes)) {
+    if (node.type.endsWith('Trigger') || node.type === 'httpEndpoint') {
+      queue.push(nodeId);
+    }
+  }
+  
+  // BFS to target
+  while (queue.length > 0) {
+    const nodeId = queue.shift()!;
+    if (visited.has(nodeId)) continue;
+    visited.add(nodeId);
+    
+    if (nodeId === targetNodeId) break;
+    
+    // Find outgoing edges
+    const outgoingEdges = this.workflow.edges.filter(
+      (edge) => edge.source === nodeId
+    );
+    
+    for (const edge of outgoingEdges) {
+      queue.push(edge.target);
+    }
+  }
+  
+  return Array.from(visited);
+}
+```
+
+#### Step 3: Create Debugger UI
+
+**File:** `src/renderer/components/WorkflowCanvas/WorkflowDebugger.tsx`
+
+```typescript
+import { Play, Pause, StepForward, Square } from 'lucide-react';
+
+interface WorkflowDebuggerProps {
+  workflowId: string;
+}
+
+export function WorkflowDebugger({ workflowId }: WorkflowDebuggerProps) {
+  const [debugState, setDebugState] = useState<{
+    isActive: boolean;
+    currentNodeId: string | null;
+    breakpoints: Set<string>;
+  }>({
+    isActive: false,
+    currentNodeId: null,
+    breakpoints: new Set(),
+  });
+  
+  const handleExecuteToNode = async (nodeId: string) => {
+    setDebugState({ ...debugState, isActive: true, currentNodeId: nodeId });
+    
+    // Generate partial workflow
+    await window.electronAPI.workflow.generatePartialPython(
+      workflowId,
+      nodeId
+    );
+    
+    // Run it
+    // TODO: Execute and capture output
+  };
+  
+  const handleStepForward = async () => {
+    // Find next node in execution order
+    // Execute just that node
+    // Update current node
+  };
+  
+  const handleStop = () => {
+    setDebugState({ isActive: false, currentNodeId: null, breakpoints: new Set() });
+  };
+  
+  return (
+    <div className="flex items-center gap-2 p-2 bg-gray-100 border-b">
+      <button
+        onClick={() => handleExecuteToNode(/* ... */)}
+        disabled={!debugState.isActive}
+        className="p-2 hover:bg-gray-200 rounded"
+        title="Continue"
+      >
+        <Play className="w-4 h-4" />
+      </button>
+      
+      <button
+        onClick={handleStepForward}
+        disabled={!debugState.isActive}
+        className="p-2 hover:bg-gray-200 rounded"
+        title="Step Forward"
+      >
+        <StepForward className="w-4 h-4" />
+      </button>
+      
+      <button
+        onClick={handleStop}
+        className="p-2 hover:bg-gray-200 rounded"
+        title="Stop Debugging"
+      >
+        <Square className="w-4 h-4" />
+      </button>
+      
+      {debugState.currentNodeId && (
+        <span className="ml-auto text-sm text-gray-600">
+          Stopped at: {debugState.currentNodeId}
+        </span>
+      )}
+    </div>
+  );
+}
+```
+
+### Success Criteria
+
+- [ ] "Execute to Here" option in context menu
+- [ ] Workflow executes up to target node and stops
+- [ ] Current node highlighted in canvas
+- [ ] Can see output of current node
+- [ ] Step forward button executes next node
+- [ ] Stop button exits debug mode
+
+### Notes
+
+This task is marked confidence 7/10 because it requires:
+- Partial code generation
+- Managing debug state across UI and backend
+- Coordinating with Python subprocess
+
+Consider deferring to later phase if timeline is tight.
+
+---
+
+## Task 2.15: Copy Execution to Canvas
+
+**Duration:** 1 day  
+**Confidence:** 9/10  
+**Priority:** MEDIUM - Nice to have
+
+### Problem Statement
+
+When you run a workflow and it produces good output, you want to:
+- "Freeze" that execution data
+- Use it as test data for further development
+- Pin it to nodes for iterating on workflow logic
+
+### User Story
+
+As a workflow builder, I want to:
+1. See execution history
+2. Click "Copy to Canvas" on a past execution
+3. Have all nodes populate with that execution's data as pinned data
+4. Continue building workflow with real data
+
+### Implementation Plan
+
+#### Step 1: Add "Copy to Canvas" Button
+
+**File:** `src/renderer/components/ExecutionHistory/ExecutionDetails.tsx`
+
+```typescript
+function ExecutionActions({ execution }: { execution: WorkflowExecution }) {
+  const handleCopyToCanvas = async () => {
+    // For each node execution, pin its output to the node
+    await window.electronAPI.execution.copyToCanvas(execution.id);
+  };
+  
+  return (
+    <div className="flex gap-2">
+      <button
+        onClick={handleCopyToCanvas}
+        className="px-3 py-1 bg-blue-600 text-white rounded text-sm 
+                   hover:bg-blue-700 flex items-center gap-2"
+      >
+        <Copy className="w-4 h-4" />
+        Copy to Canvas
+      </button>
+      
+      <button
+        onClick={() => handleDeleteExecution(execution.id)}
+        className="px-3 py-1 bg-red-600 text-white rounded text-sm
+                   hover:bg-red-700 flex items-center gap-2"
+      >
+        <Trash2 className="w-4 h-4" />
+        Delete
+      </button>
+    </div>
+  );
+}
+```
+
+#### Step 2: Implement Copy to Canvas Logic
+
+**File:** `electron/execution-handlers.ts`
+
+```typescript
+ipcMain.handle('execution:copy-to-canvas', async (event, executionId: string) => {
+  const execution = executionLogger.getExecution(executionId);
+  if (!execution) {
+    throw new Error('Execution not found');
+  }
+  
+  // Return node data for pinning
+  return {
+    workflowId: execution.workflowId,
+    nodePins: execution.nodeExecutions.map((nodeExec) => ({
+      nodeId: nodeExec.nodeId,
+      data: nodeExec.output || nodeExec.input, // Use output, fallback to input
+    })),
+  };
+});
+```
+
+#### Step 3: Pin All Node Data
+
+**File:** `src/renderer/components/ExecutionHistory/ExecutionDetails.tsx`
+
+```typescript
+const handleCopyToCanvas = async () => {
+  const result = await window.electronAPI.execution.copyToCanvas(execution.id);
+  
+  // Pin all nodes
+  for (const pin of result.nodePins) {
+    useWorkflowStore.getState().pinNodeData(
+      result.workflowId,
+      pin.nodeId,
+      pin.data
+    );
+  }
+  
+  // Show success toast
+  toast.success(`Pinned data from ${result.nodePins.length} nodes`);
+  
+  // Close execution history panel (optional)
+};
+```
+
+### Success Criteria
+
+- [ ] "Copy to Canvas" button appears on execution details
+- [ ] Clicking button pins all node outputs
+- [ ] Nodes show pinned indicator
+- [ ] Can continue editing workflow with pinned data
+- [ ] Success notification shown
+
+### Files to Create
+
+None (uses existing files)
+
+### Files to Modify
+
+- `electron/execution-handlers.ts` - Add copy-to-canvas handler
+- `src/renderer/components/ExecutionHistory/ExecutionDetails.tsx` - Add button
+
+---
+
+## Task 2.16: Data Passthrough Architecture
+
+**Duration:** 2-3 days  
+**Confidence:** 6/10  
+**Priority:** HIGH - Prevents n8n's "dunno which item" problem
+
+### Problem Statement
+
+n8n's biggest pain point: when you have multiple items from a node, and later nodes don't know which item they originated from. Example:
+
+```
+HTTP Request (gets user data)
+  ↓
+HTTP Request (fetches profile photo)  ← loses original user data!
+  ↓
+IF condition (needs to check user.isPremium)  ← ERROR: "don't know which item"
+```
+
+Solution: **Optional passthrough** - thread previous data through all subsequent nodes.
+
+### User Story
+
+As a workflow builder, I want to:
+1. Enable "passthrough" on any node
+2. Have that node include input data in its output
+3. Access any previous node's data anywhere in workflow
+4. Never see "dunno which item" errors
+
+### Implementation Plan
+
+#### Step 1: Add Passthrough Config to All Nodes
+
+**File:** `src/core/workflow/types.ts`
+
+```typescript
+export interface NodeConfig {
+  // ... existing node-specific config
+  
+  // NEW: Universal passthrough option
+  _passthrough?: boolean; // Underscore prefix to distinguish from node config
+}
+```
+
+#### Step 2: Add Passthrough UI to Properties Panel
+
+**File:** `src/renderer/components/WorkflowCanvas/NodeConfigForm.tsx`
+
+Add at the bottom of every node's config form:
+
+```typescript
+export function NodeConfigForm({ workflowId, node }: NodeConfigFormProps) {
+  return (
+    <div className="space-y-4">
+      {/* ... existing fields */}
+      
+      {/* Passthrough toggle - shown for ALL nodes */}
+      <div className="pt-4 border-t border-gray-200">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={node.config._passthrough || false}
+            onChange={(e) => 
+              updateNodeConfig(workflowId, node.id, '_passthrough', e.target.checked)
+            }
+            className="w-4 h-4 text-blue-600"
+          />
+          <div>
+            <div className="font-medium text-sm">Enable Passthrough</div>
+            <div className="text-xs text-gray-500">
+              Include input data in output (prevents "unknown item" errors)
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+  );
+}
+```
+
+#### Step 3: Update ExecutionContext
+
+**File:** `src/core/codegen/python/templates/execution-context.py.template`
+
+```python
+class ExecutionContext:
+    def __init__(self, trigger_data: Any):
+        self.node_outputs: dict[str, Any] = {}
+        self.trigger_data = trigger_data
+        
+        # NEW: Data lineage tracking
+        self.data_lineage: dict[str, list[str]] = {}  # nodeId -> [parent nodes]
+    
+    def set_node_output(
+        self, 
+        node_id: str, 
+        output: Any,
+        parent_node_id: str | None = None,
+        passthrough: bool = False
+    ):
+        """Set node output with optional passthrough"""
+        
+        # Store output
+        self.node_outputs[node_id] = output
+        
+        # Track lineage
+        if parent_node_id:
+            parent_lineage = self.data_lineage.get(parent_node_id, [])
+            self.data_lineage[node_id] = parent_lineage + [parent_node_id]
+        
+        # If passthrough enabled, merge input with output
+        if passthrough and parent_node_id:
+            parent_output = self.node_outputs.get(parent_node_id)
+            if parent_output:
+                # Merge: wrap both in object if needed
+                if isinstance(output, dict) and isinstance(parent_output, dict):
+                    # Merge dicts
+                    self.node_outputs[node_id] = {
+                        **parent_output,
+                        **output,
+                        '_origin': parent_output,  # Keep original
+                        '_current': output,
+                    }
+                else:
+                    # Wrap in object
+                    self.node_outputs[node_id] = {
+                        '_origin': parent_output,
+                        '_current': output,
+                    }
+    
+    def get_node_output(self, node_id: str) -> Any:
+        """Get output from any previous node"""
+        return self.node_outputs.get(node_id)
+    
+    def get_origin_data(self, node_id: str) -> Any:
+        """Get original input data that started this execution path"""
+        lineage = self.data_lineage.get(node_id, [])
+        if not lineage:
+            return self.trigger_data
+        
+        # Follow lineage back to start
+        origin_node = lineage[0]
+        return self.node_outputs.get(origin_node, self.trigger_data)
+```
+
+#### Step 4: Generate Passthrough Logic in Nodes
+
+**File:** `src/core/codegen/python/node-generators/http-request.py.ts`
+
+Example for httpRequest node:
+
+```typescript
+export function generateHttpRequestNode(
+  node: NodeDefinition,
+  workflow: WorkflowDefinition
+): string {
+  const config = node.config;
+  const passthrough = config._passthrough || false;
+  
+  // Find parent node (input)
+  const incomingEdge = workflow.edges.find(
+    (edge) => edge.target === node.id
+  );
+  const parentNodeId = incomingEdge?.source;
+  
+  return `
+async def ${node.id}(context: ExecutionContext) -> Any:
+    """${node.name}"""
+    
+    # Get input from parent node
+    ${parentNodeId ? `input_data = context.get_node_output("${parentNodeId}")` : 'input_data = context.trigger_data'}
+    
+    # Make HTTP request
+    response = await httpx.post(
+        "${config.url}",
+        json=input_data,
+        timeout=30.0
+    )
+    response.raise_for_status()
+    output = response.json()
+    
+    # Store output with passthrough
+    context.set_node_output(
+        "${node.id}",
+        output,
+        parent_node_id="${parentNodeId || ''}",
+        passthrough=${passthrough}
+    )
+    
+    return output
+`;
+}
+```
+
+#### Step 5: Update Template Expressions
+
+**File:** `src/core/codegen/python/expression-compiler.ts`
+
+Update expression compiler to support accessing lineage:
+
+```typescript
+// Support these expressions:
+// {{input.data}}           - Current input
+// {{output.node_http_1}}   - Specific node output
+// {{origin.userId}}        - Original trigger data
+
+export function compileExpression(expr: string): string {
+  // Replace {{origin.field}} with context.get_origin_data()
+  expr = expr.replace(
+    /\{\{origin\.(\w+)\}\}/g,
+    'context.get_origin_data(current_node_id).get("$1")'
+  );
+  
+  // Replace {{output.nodeId.field}}
+  expr = expr.replace(
+    /\{\{output\.(\w+)\.(\w+)\}\}/g,
+    'context.get_node_output("$1").get("$2")'
+  );
+  
+  return expr;
+}
+```
+
+### Success Criteria
+
+- [ ] Passthrough checkbox appears on all nodes
+- [ ] Enabling passthrough merges input with output
+- [ ] Can access origin data via {{origin.field}}
+- [ ] Can access any node's output via {{output.nodeId.field}}
+- [ ] No "unknown item" errors when using passthrough
+- [ ] Passthrough doesn't break existing workflows (backwards compatible)
+
+### Testing Plan
+
+1. **Create test workflow:**
+   ```
+   HTTP Trigger (returns {userId: 123})
+     ↓
+   HTTP Request (passthrough: true, fetches {photo: "url"})
+     ↓
+   IF condition (checks {{origin.userId}})
+   ```
+
+2. **Verify:**
+   - HTTP Request output contains both userId and photo
+   - IF condition can access original userId
+   - No errors about unknown items
+
+### Files to Create
+
+- `tests/passthrough.test.ts`
+
+### Files to Modify
+
+- `src/core/workflow/types.ts` - Add _passthrough config
+- `src/renderer/components/WorkflowCanvas/NodeConfigForm.tsx` - Add toggle
+- `src/core/codegen/python/templates/execution-context.py.template` - Lineage tracking
+- All node generators in `src/core/codegen/python/node-generators/` - Add passthrough logic
+- `src/core/codegen/python/expression-compiler.ts` - Support origin/output refs
+
+### Risk Assessment
+
+**Confidence: 6/10** because:
+- ✅ Concept is straightforward
+- ⚠️  Requires updating EVERY node generator
+- ⚠️  Expression compiler changes are complex
+- ⚠️  Need to ensure backwards compatibility
+
+Consider implementing as Phase 3 feature if too complex for Phase 2.5.
+
+---
+
+## Phase 2.5 Deliverables Summary
+
+| Task | Deliverable | Critical? |
+|------|-------------|-----------|
+| 2.10 | Properties Panel | ✅ YES - Can't configure nodes without it |
+| 2.11 | Execution Logging | ✅ YES - Foundation for testing |
+| 2.12 | Execution History UI | ✅ YES - Makes logging useful |
+| 2.13 | Node Pinning | ✅ YES - Essential for testing |
+| 2.14 | Node-by-Node Execution | ⚠️ NICE - Defer if needed |
+| 2.15 | Copy Execution to Canvas | ⚠️ NICE - Defer if needed |
+| 2.16 | Data Passthrough | ✅ YES - Prevents major pain point |
+
+---
+
+## Human Review Checkpoint
+
+**After completing Phase 2.5:**
+
+Review focus:
+- Properties panel usable for all node types
+- Execution history capturing correctly
+- Node pinning working smoothly
+- Data passthrough preventing "unknown item" errors
+
+**Ready for Phase 3:** Data Integration (Qdrant, Postgres, etc.)
+
+---
+
+**Next Phase:** [CATALYST_PHASE_3_TASKS.md](./CATALYST_PHASE_3_TASKS.md) - Data Integration

@@ -63,6 +63,82 @@ export interface HandleDefinition {
 }
 
 // ============================================================
+// CONFIG FIELD DEFINITIONS
+// ============================================================
+
+/**
+ * Field type for dynamic form generation
+ * Maps to specific input components in the UI
+ */
+export type ConfigFieldType = 
+  | 'text'        // Single-line text input
+  | 'number'      // Number input with min/max/step
+  | 'select'      // Dropdown selection
+  | 'textarea'    // Multi-line text input
+  | 'boolean'     // Checkbox toggle
+  | 'secret';     // Password-style masked input
+
+/**
+ * Configuration field definition for dynamic forms
+ * Used to generate property panel forms for node configuration
+ * 
+ * FEATURES:
+ * - Supports nested paths (e.g., 'options.temperature')
+ * - Type-specific validation (min/max for numbers)
+ * - Required field validation
+ * - Select dropdowns with predefined options
+ * - Description text for user guidance
+ * 
+ * @example
+ * ```typescript
+ * const field: ConfigFieldDefinition = {
+ *   path: 'apiKey',
+ *   label: 'API Key',
+ *   type: 'secret',
+ *   required: true,
+ *   description: 'Your Groq API key (stored securely)',
+ * };
+ * ```
+ */
+export interface ConfigFieldDefinition {
+  /** Field path (supports dot notation for nested fields, e.g., 'options.temperature') */
+  path: string;
+  
+  /** Display label shown above the input */
+  label: string;
+  
+  /** Input component type to render */
+  type: ConfigFieldType;
+  
+  /** Whether this field is required (shows asterisk, validates on submit) */
+  required?: boolean;
+  
+  /** Placeholder text for empty inputs */
+  placeholder?: string;
+  
+  /** Help text shown below the input */
+  description?: string;
+  
+  /** Options for select dropdowns */
+  options?: Array<{ label: string; value: any }>;
+  
+  /** Minimum value for number inputs */
+  min?: number;
+  
+  /** Maximum value for number inputs */
+  max?: number;
+  
+  /** Step increment for number inputs */
+  step?: number;
+  
+  /** Number of rows for textarea inputs */
+  rows?: number;
+  
+  /** Default value if field is empty */
+  defaultValue?: any;
+}
+
+// ============================================================
 // NODE METADATA
 // ============================================================
 
@@ -82,6 +158,7 @@ export interface HandleDefinition {
  *   inputs: [{ id: 'input', name: 'Input', type: 'default' }],
  *   outputs: [{ id: 'output', name: 'Response', type: 'default' }],
  *   configSchema: anthropicCompletionConfigSchema,
+ *   configFields: [...], // NEW: Dynamic form fields
  * };
  * ```
  */
@@ -102,6 +179,7 @@ export interface NodeMetadata {
   
   // Configuration
   configSchema: z.ZodTypeAny;           // Zod schema for validation
+  configFields?: ConfigFieldDefinition[]; // NEW: Dynamic form field definitions
   
   // Documentation
   documentation?: string;               // Optional detailed documentation
