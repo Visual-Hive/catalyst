@@ -386,6 +386,7 @@ export function generatePythonWorkflow(
   
   const code = assembleCompleteFile(
     workflow,
+    nodes,
     libraryModules,
     workflowLogic,
     warnings
@@ -409,9 +410,96 @@ export function generatePythonWorkflow(
 // ============================================================================
 
 /**
+ * Check if a node type is a trigger node
+ * 
+ * Trigger nodes define HOW workflows are invoked (HTTP, scheduled, webhook, etc.)
+ * but they don't execute as part of the workflow logic. They are metadata only.
+ * 
+ * The FastAPI route decorator (@app.post) handles the actual trigger behavior,
+ * so trigger nodes should be skipped during workflow execution.
+ * 
+ * @param nodeType - Node type to check
+ * @returns true if node is a trigger, false otherwise
+ */
+function isTriggerNode(nodeType: NodeType): boolean {
+  const triggerTypes: NodeType[] = [
+    'httpEndpoint',
+    'scheduledTask',
+    'webhookReceiver',
+    'subworkflowTrigger',
+    'websocketEndpoint',
+    'queueConsumer',
+  ];
+  return triggerTypes.includes(nodeType);
+}
+
+/**
+ * Generate minimal workflow endpoint for trigger-only workflows
+ * 
+ * Used when a workflow contains only trigger nodes (no executable nodes).
+ * This is an edge case but valid - workflow just receives data and returns it.
+ * 
+ * @param workflow - Workflow definition
+ * @returns Python code for minimal endpoint
+ */
+function generateMinimalWorkflowEndpoint(workflow: WorkflowDefinition): string {
+  return `
+@app.post("/workflow/${sanitizeWorkflowName(workflow.name)}")
+async def workflow_${sanitizeWorkflowName(workflow.name)}(input_data: dict):
+    """
+    ${workflow.description || 'Generated workflow endpoint'}
+    
+    Workflow: ${workflow.name}
+    Note: This workflow contains only trigger nodes (no executable logic)
+    """
+    # Generate execution ID
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.utcnow().isoformat()
+    
+    logger.info(f"Starting workflow: ${workflow.name} (execution: {execution_id})")
+    
+    # Minimal execution - just return input data
+    execution_data = {
+        "id": execution_id,
+        "workflowId": "${workflow.id}",
+        "workflowName": "${workflow.name}",
+        "status": "success",
+        "startedAt": started_at,
+        "completedAt": datetime.utcnow().isoformat(),
+        "durationMs": 0,
+        "trigger": {
+            "type": "${workflow.trigger?.type || 'httpEndpoint'}",
+            "data": input_data
+        },
+        "nodeExecutions": [],
+        "output": input_data,
+    }
+    
+    logger.info(f"Workflow completed (execution: {execution_id})")
+    
+    # Output execution markers for Catalyst local execution capture
+    import json
+    print("__CATALYST_EXECUTION_START__")
+    print(json.dumps(execution_data))
+    print("__CATALYST_EXECUTION_END__")
+    
+    return {
+        "status": "success",
+        "workflow": "${workflow.name}",
+        "executionId": execution_id,
+        "result": input_data,
+    }
+`;
+}
+
+/**
  * Generate workflow execution logic
  * 
  * Creates the FastAPI endpoint that executes the workflow nodes in order.
+ * 
+ * IMPORTANT: Trigger nodes are filtered out because they define invocation
+ * method (HTTP, scheduled, etc.) but don't execute code themselves.
+ * The FastAPI route decorator handles trigger behavior.
  * 
  * For MVP: Simple sequential execution
  * Future: Respect edges, parallel execution, conditional branches
@@ -424,19 +512,56 @@ function generateWorkflowExecutionLogic(
   workflow: WorkflowDefinition,
   nodes: NodeDefinition[]
 ): string {
-  // Generate node execution calls
-  const nodeExecutions = nodes.map((node, index) => {
+  // Filter out trigger nodes - they don't execute, they define invocation method
+  const executableNodes = nodes.filter(node => !isTriggerNode(node.type));
+  
+  // If no executable nodes, return minimal endpoint
+  if (executableNodes.length === 0) {
+    return generateMinimalWorkflowEndpoint(workflow);
+  }
+  
+  // Generate node execution calls with tracking
+  const nodeExecutions = executableNodes.map((node, index) => {
     const varName = `result_${index + 1}`;
     const functionName = getExecutionFunctionName(node.type);
     const config = JSON.stringify(node.config, null, 4);
     
-    return `    # Node: ${node.name} (${node.type})
-    ${varName} = await ${functionName}(ctx, ${config})
-    logger.info(f"Node '${node.name}' completed")`;
+    return `        # Node: ${node.name} (${node.type})
+        node_exec_${index + 1} = NodeExecution(
+            node_id="${node.id}",
+            node_name="${node.name}",
+            node_type="${node.type}",
+            status="running",
+            started_at=datetime.utcnow().isoformat(),
+            input={}  # TODO: Extract actual input from config
+        )
+        ctx.node_executions.append(node_exec_${index + 1})
+        
+        try:
+            node_start = datetime.utcnow()
+            ${varName} = await ${functionName}(ctx, ${config})
+            node_end = datetime.utcnow()
+            
+            node_exec_${index + 1}.status = "success"
+            node_exec_${index + 1}.completed_at = node_end.isoformat()
+            node_exec_${index + 1}.duration_ms = int((node_end - node_start).total_seconds() * 1000)
+            node_exec_${index + 1}.output = ${varName} if isinstance(${varName}, dict) else {"result": ${varName}}
+            
+            logger.info(f"Node '${node.name}' completed successfully")
+        except Exception as e:
+            node_end = datetime.utcnow()
+            node_exec_${index + 1}.status = "error"
+            node_exec_${index + 1}.completed_at = node_end.isoformat()
+            node_exec_${index + 1}.duration_ms = int((node_end - node_start).total_seconds() * 1000)
+            node_exec_${index + 1}.error_message = str(e)
+            node_exec_${index + 1}.error_stack = traceback.format_exc()
+            
+            logger.error(f"Node '${node.name}' failed: {e}")
+            raise`;
   }).join('\n\n');
   
   // Last result is the workflow output
-  const lastResultVar = `result_${nodes.length}`;
+  const lastResultVar = `result_${executableNodes.length}`;
   
   return `
 @app.post("/workflow/${sanitizeWorkflowName(workflow.name)}")
@@ -445,9 +570,13 @@ async def workflow_${sanitizeWorkflowName(workflow.name)}(input_data: dict):
     ${workflow.description || 'Generated workflow endpoint'}
     
     Workflow: ${workflow.name}
-    Nodes: ${nodes.length}
+    Nodes: ${executableNodes.length}
     """
-    logger.info("Starting workflow: ${workflow.name}")
+    # Generate execution ID
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.utcnow().isoformat()
+    
+    logger.info(f"Starting workflow: ${workflow.name} (execution: {execution_id})")
     
     # Initialize execution context
     # In production, load secrets from environment variables
@@ -458,17 +587,104 @@ async def workflow_${sanitizeWorkflowName(workflow.name)}(input_data: dict):
             "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
         },
         input_data=input_data,
+        node_executions=[],
     )
     
-${nodeExecutions}
-    
-    logger.info("Workflow completed successfully")
-    
-    return {
-        "status": "success",
-        "workflow": "${workflow.name}",
-        "result": ${lastResultVar},
+    # Prepare execution data for logging
+    execution_data = {
+        "id": execution_id,
+        "workflowId": "${workflow.id}",
+        "workflowName": "${workflow.name}",
+        "status": "running",
+        "startedAt": started_at,
+        "trigger": {
+            "type": "${workflow.trigger?.type || 'httpEndpoint'}",
+            "data": input_data
+        },
+        "nodeExecutions": []
     }
+    
+    try:
+${nodeExecutions}
+        
+        # Mark execution as successful
+        execution_data["status"] = "success"
+        execution_data["completedAt"] = datetime.utcnow().isoformat()
+        execution_data["durationMs"] = int(
+            (datetime.fromisoformat(execution_data["completedAt"]) - 
+             datetime.fromisoformat(started_at)).total_seconds() * 1000
+        )
+        execution_data["nodeExecutions"] = [
+            {
+                "nodeId": ne.node_id,
+                "nodeName": ne.node_name,
+                "nodeType": ne.node_type,
+                "status": ne.status,
+                "startedAt": ne.started_at,
+                "completedAt": ne.completed_at,
+                "durationMs": ne.duration_ms,
+                "input": ne.input,
+                "output": ne.output,
+                "error": {
+                    "message": ne.error_message,
+                    "stack": ne.error_stack
+                } if ne.error_message else None
+            }
+            for ne in ctx.node_executions
+        ]
+        
+        logger.info(f"Workflow completed successfully (execution: {execution_id})")
+        
+        # Log execution asynchronously (don't block response)
+        asyncio.create_task(log_execution_to_catalyst(execution_data))
+        
+        # Output execution markers for Catalyst local execution capture
+        # These markers allow the Electron app to extract execution data from stdout
+        import json
+        print("__CATALYST_EXECUTION_START__")
+        print(json.dumps(execution_data))
+        print("__CATALYST_EXECUTION_END__")
+        
+        return {
+            "status": "success",
+            "workflow": "${workflow.name}",
+            "executionId": execution_id,
+            "result": ${lastResultVar},
+        }
+        
+    except Exception as e:
+        # Mark execution as failed
+        execution_data["status"] = "error"
+        execution_data["completedAt"] = datetime.utcnow().isoformat()
+        execution_data["error"] = {
+            "message": str(e),
+            "stack": traceback.format_exc()
+        }
+        execution_data["nodeExecutions"] = [
+            {
+                "nodeId": ne.node_id,
+                "nodeName": ne.node_name,
+                "nodeType": ne.node_type,
+                "status": ne.status,
+                "startedAt": ne.started_at,
+                "completedAt": ne.completed_at,
+                "durationMs": ne.duration_ms,
+                "input": ne.input,
+                "output": ne.output,
+                "error": {
+                    "message": ne.error_message,
+                    "stack": ne.error_stack
+                } if ne.error_message else None
+            }
+            for ne in ctx.node_executions
+        ]
+        
+        logger.error(f"Workflow failed (execution: {execution_id}): {e}")
+        
+        # Log failed execution asynchronously
+        asyncio.create_task(log_execution_to_catalyst(execution_data))
+        
+        raise HTTPException(status_code=500, detail=str(e))
 `;
 }
 
@@ -479,6 +695,7 @@ ${nodeExecutions}
  * into a complete, runnable Python file.
  * 
  * @param workflow - Workflow definition
+ * @param nodes - Array of nodes in workflow
  * @param libraryModules - Generated library code modules
  * @param workflowLogic - Workflow execution endpoint
  * @param warnings - Array to collect warnings
@@ -486,6 +703,7 @@ ${nodeExecutions}
  */
 function assembleCompleteFile(
   workflow: WorkflowDefinition,
+  nodes: NodeDefinition[],
   libraryModules: string[],
   workflowLogic: string,
   warnings: string[]
@@ -506,10 +724,17 @@ Trigger: ${workflow.trigger?.type || 'httpEndpoint'}
 """
 
 import os
+import sys
+import json
 import logging
-from typing import Any, Dict, Optional
+import asyncio
+import uuid
+import traceback
+from datetime import datetime
+from typing import Any, Dict, Optional, List
 from fastapi import FastAPI, HTTPException
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import httpx
 
 # Configure logging
 logging.basicConfig(
@@ -520,8 +745,50 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# EXECUTION LOGGING
+# ============================================================================
+
+# Catalyst editor URL for execution logging
+CATALYST_EDITOR_URL = os.getenv('CATALYST_EDITOR_URL', 'http://localhost:3000')
+
+async def log_execution_to_catalyst(execution_data: Dict[str, Any]):
+    """
+    Send execution data back to Catalyst editor for logging.
+    
+    This is non-blocking and will not fail the workflow if logging fails.
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                f"{CATALYST_EDITOR_URL}/api/executions",
+                json=execution_data,
+                timeout=2.0
+            )
+        logger.debug(f"Logged execution {execution_data.get('id')} to Catalyst")
+    except Exception as e:
+        # Don't fail workflow if logging fails
+        logger.warning(f"Failed to log execution to Catalyst: {e}")
+
+
+# ============================================================================
 # EXECUTION CONTEXT
 # ============================================================================
+
+@dataclass
+class NodeExecution:
+    """Tracks execution of a single node."""
+    node_id: str
+    node_name: str
+    node_type: str
+    status: str = "pending"  # pending, running, success, error, skipped
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    duration_ms: Optional[int] = None
+    input: Dict[str, Any] = field(default_factory=dict)
+    output: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    error_stack: Optional[str] = None
+
 
 @dataclass
 class ExecutionContext:
@@ -532,10 +799,12 @@ class ExecutionContext:
     - secrets: API keys and credentials
     - input_data: Input data from workflow trigger
     - state: Workflow state (for future use)
+    - node_executions: Track node execution history
     """
     secrets: Dict[str, str]
     input_data: Dict[str, Any]
     state: Dict[str, Any] = None
+    node_executions: List[NodeExecution] = field(default_factory=list)
     
     def __post_init__(self):
         if self.state is None:
@@ -574,6 +843,9 @@ async def health_check():
 ${libraryModules.join('\n\n')}
 `;
 
+  // Test execution function (must be declared before use in workflowSection)
+  const testExecutionFunction = generateTestExecutionFunction(workflow, nodes);
+  
   // Workflow logic section
   const workflowSection = `
 # ============================================================================
@@ -581,37 +853,98 @@ ${libraryModules.join('\n\n')}
 # ============================================================================
 
 ${workflowLogic}
+
+${testExecutionFunction}
 `;
 
-  // Main section
+  // Main section with mode detection
   const mainSection = `
 # ============================================================================
 # MAIN
 # ============================================================================
 
 if __name__ == "__main__":
-    import uvicorn
+    # Detect execution mode from environment variable
+    # - 'test': Execute once with stdin data and exit (for local testing)
+    # - 'production': Start FastAPI server (default, for deployment)
+    execution_mode = os.getenv('CATALYST_EXECUTION_MODE', 'production')
     
-    # Check for required environment variables
-    required_env_vars = ["GROQ_API_KEY"]  # Adjust based on nodes used
-    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+    if execution_mode == 'test':
+        # TEST MODE: Execute workflow once and exit
+        logger.info("Running in TEST mode (one-shot execution)")
+        
+        try:
+            # Read trigger data from stdin
+            import sys
+            trigger_data_str = sys.stdin.read()
+            trigger_data = json.loads(trigger_data_str)
+            
+            logger.info(f"Received trigger data: {trigger_data}")
+            
+            # Execute workflow synchronously
+            execution_result = asyncio.run(execute_workflow_test(trigger_data))
+            
+            # Print execution result with markers for WorkflowExecutor to parse
+            print("__CATALYST_EXECUTION_START__")
+            print(json.dumps(execution_result, indent=2))
+            print("__CATALYST_EXECUTION_END__")
+            
+            # Exit successfully
+            sys.exit(0)
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse trigger data from stdin: {e}")
+            print("__CATALYST_EXECUTION_START__")
+            print(json.dumps({
+                "status": "error",
+                "error": {
+                    "message": f"Invalid JSON in trigger data: {str(e)}",
+                    "type": "JSONDecodeError"
+                }
+            }))
+            print("__CATALYST_EXECUTION_END__")
+            sys.exit(1)
+            
+        except Exception as e:
+            logger.error(f"Test execution failed: {e}")
+            print("__CATALYST_EXECUTION_START__")
+            print(json.dumps({
+                "status": "error",
+                "error": {
+                    "message": str(e),
+                    "type": type(e).__name__,
+                    "stack": traceback.format_exc()
+                }
+            }))
+            print("__CATALYST_EXECUTION_END__")
+            sys.exit(1)
     
-    if missing_vars:
-        logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
-        logger.error("Please set these variables before running the workflow")
-        exit(1)
-    
-    logger.info("Starting Catalyst workflow server...")
-    logger.info(f"Workflow: ${workflow.name}")
-    logger.info(f"Nodes: ${Object.keys(workflow.nodes).length}")
-    
-    # Start server
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        log_level="info",
-    )
+    else:
+        # PRODUCTION MODE: Start FastAPI server
+        import uvicorn
+        
+        logger.info("Running in PRODUCTION mode (FastAPI server)")
+        
+        # Check for required environment variables
+        required_env_vars = ["GROQ_API_KEY"]  # Adjust based on nodes used
+        missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+        
+        if missing_vars:
+            logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
+            logger.error("Please set these variables before running the workflow")
+            exit(1)
+        
+        logger.info("Starting Catalyst workflow server...")
+        logger.info(f"Workflow: ${workflow.name}")
+        logger.info(f"Nodes: ${Object.keys(workflow.nodes).length}")
+        
+        # Start server
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            log_level="info",
+        )
 `;
 
   // Combine all sections
@@ -695,6 +1028,273 @@ function getExecutionFunctionName(nodeType: NodeType): string {
   };
   
   return functionNames[nodeType] || 'execute_unknown_node';
+}
+
+/**
+ * Generate minimal test execution function for trigger-only workflows
+ * 
+ * Used when a workflow contains only trigger nodes (no executable nodes).
+ * Returns input data immediately without any node execution.
+ * 
+ * @param workflow - Workflow definition
+ * @returns Python code for minimal test execution function
+ */
+function generateMinimalTestExecutionFunction(workflow: WorkflowDefinition): string {
+  return `
+# ============================================================================
+# TEST EXECUTION FUNCTION
+# ============================================================================
+
+async def execute_workflow_test(trigger_data: dict) -> dict:
+    """
+    Execute workflow once with provided trigger data (test mode).
+    
+    Note: This workflow contains only trigger nodes (no executable logic).
+    Returns input data immediately.
+    """
+    # Generate execution ID
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.utcnow()
+    
+    logger.info(f"[TEST MODE] Starting workflow: ${workflow.name} (execution: {execution_id})")
+    logger.info("[TEST MODE] Workflow contains only trigger nodes, no execution needed")
+    
+    # Minimal execution result
+    execution_result = {
+        "id": execution_id,
+        "workflowId": "${workflow.id}",
+        "workflowName": "${workflow.name}",
+        "status": "success",
+        "startedAt": started_at.isoformat(),
+        "completedAt": datetime.utcnow().isoformat(),
+        "durationMs": 0,
+        "trigger": {
+            "type": "${workflow.trigger?.type || 'httpEndpoint'}",
+            "data": trigger_data
+        },
+        "nodeExecutions": [],
+        "output": trigger_data,
+    }
+    
+    logger.info(f"[TEST MODE] Workflow completed (execution: {execution_id})")
+    
+    return execution_result
+`;
+}
+
+/**
+ * Generate test execution function
+ * 
+ * Creates an async function that executes the workflow once with provided
+ * trigger data, without starting a FastAPI server. Used for local testing.
+ * 
+ * DESIGN:
+ * - Takes trigger data as parameter (from stdin in test mode)
+ * - Executes nodes in topological order (excluding triggers)
+ * - Captures execution details (timing, inputs, outputs, errors)
+ * - Returns structured execution JSON
+ * - No FastAPI dependencies
+ * 
+ * @param workflow - Workflow definition
+ * @param nodes - Array of nodes to execute
+ * @returns Python code for test execution function
+ */
+function generateTestExecutionFunction(
+  workflow: WorkflowDefinition,
+  nodes: NodeDefinition[]
+): string {
+  // Filter out trigger nodes (same logic as FastAPI endpoint)
+  const executableNodes = nodes.filter(node => !isTriggerNode(node.type));
+  
+  // If no executable nodes, return minimal test function
+  if (executableNodes.length === 0) {
+    return generateMinimalTestExecutionFunction(workflow);
+  }
+  
+  // Generate node execution calls (same logic as FastAPI endpoint)
+  const nodeExecutions = executableNodes.map((node, index) => {
+    const varName = `result_${index + 1}`;
+    const functionName = getExecutionFunctionName(node.type);
+    const config = JSON.stringify(node.config, null, 4);
+    
+    return `        # Node: ${node.name} (${node.type})
+        node_exec_${index + 1} = NodeExecution(
+            node_id="${node.id}",
+            node_name="${node.name}",
+            node_type="${node.type}",
+            status="running",
+            started_at=datetime.utcnow().isoformat(),
+            input={}  # TODO: Extract actual input from config
+        )
+        ctx.node_executions.append(node_exec_${index + 1})
+        
+        try:
+            node_start = datetime.utcnow()
+            ${varName} = await ${functionName}(ctx, ${config})
+            node_end = datetime.utcnow()
+            
+            node_exec_${index + 1}.status = "success"
+            node_exec_${index + 1}.completed_at = node_end.isoformat()
+            node_exec_${index + 1}.duration_ms = int((node_end - node_start).total_seconds() * 1000)
+            node_exec_${index + 1}.output = ${varName} if isinstance(${varName}, dict) else {"result": ${varName}}
+            
+            logger.info(f"Node '${node.name}' completed successfully")
+        except Exception as e:
+            node_end = datetime.utcnow()
+            node_exec_${index + 1}.status = "error"
+            node_exec_${index + 1}.completed_at = node_end.isoformat()
+            node_exec_${index + 1}.duration_ms = int((node_end - node_start).total_seconds() * 1000)
+            node_exec_${index + 1}.error_message = str(e)
+            node_exec_${index + 1}.error_stack = traceback.format_exc()
+            
+            logger.error(f"Node '${node.name}' failed: {e}")
+            raise`;
+  }).join('\n\n');
+  
+  // Last result is the workflow output
+  const lastResultVar = `result_${executableNodes.length}`;
+  
+  return `
+# ============================================================================
+# TEST EXECUTION FUNCTION
+# ============================================================================
+
+async def execute_workflow_test(trigger_data: dict) -> dict:
+    """
+    Execute workflow once with provided trigger data (test mode).
+    
+    This function is used for local testing and bypasses FastAPI.
+    It executes the workflow synchronously and returns the execution result.
+    
+    Args:
+        trigger_data: Simulated HTTP request or other trigger data
+        
+    Returns:
+        Execution result with node executions, timing, and output
+        
+    Used by:
+        - Catalyst local execution runner (WorkflowExecutor)
+        - Manual testing with CATALYST_EXECUTION_MODE=test
+        
+    Example trigger_data:
+        {
+            "method": "POST",
+            "path": "/api/search",
+            "headers": {"Content-Type": "application/json"},
+            "body": {"query": "test"},
+            "query": {}
+        }
+    """
+    # Generate execution ID
+    execution_id = str(uuid.uuid4())
+    started_at = datetime.utcnow()
+    started_at_iso = started_at.isoformat()
+    
+    logger.info(f"[TEST MODE] Starting workflow: ${workflow.name} (execution: {execution_id})")
+    
+    # Initialize execution context
+    ctx = ExecutionContext(
+        secrets={
+            "GROQ_API_KEY": os.getenv("GROQ_API_KEY"),
+            "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY"),
+            "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
+        },
+        input_data=trigger_data,
+        node_executions=[],
+    )
+    
+    try:
+${nodeExecutions}
+        
+        # Calculate execution duration
+        completed_at = datetime.utcnow()
+        duration_ms = int((completed_at - started_at).total_seconds() * 1000)
+        
+        # Build execution result
+        execution_result = {
+            "id": execution_id,
+            "workflowId": "${workflow.id}",
+            "workflowName": "${workflow.name}",
+            "status": "success",
+            "startedAt": started_at_iso,
+            "completedAt": completed_at.isoformat(),
+            "durationMs": duration_ms,
+            "trigger": {
+                "type": "${workflow.trigger?.type || 'httpEndpoint'}",
+                "data": trigger_data
+            },
+            "nodeExecutions": [
+                {
+                    "nodeId": ne.node_id,
+                    "nodeName": ne.node_name,
+                    "nodeType": ne.node_type,
+                    "status": ne.status,
+                    "startedAt": ne.started_at,
+                    "completedAt": ne.completed_at,
+                    "durationMs": ne.duration_ms,
+                    "input": ne.input,
+                    "output": ne.output,
+                    "error": {
+                        "message": ne.error_message,
+                        "stack": ne.error_stack
+                    } if ne.error_message else None
+                }
+                for ne in ctx.node_executions
+            ],
+            "output": ${lastResultVar} if isinstance(${lastResultVar}, dict) else {"result": ${lastResultVar}},
+        }
+        
+        logger.info(f"[TEST MODE] Workflow completed successfully (execution: {execution_id})")
+        
+        return execution_result
+        
+    except Exception as e:
+        # Calculate execution duration
+        completed_at = datetime.utcnow()
+        duration_ms = int((completed_at - started_at).total_seconds() * 1000)
+        
+        # Build error execution result
+        execution_result = {
+            "id": execution_id,
+            "workflowId": "${workflow.id}",
+            "workflowName": "${workflow.name}",
+            "status": "error",
+            "startedAt": started_at_iso,
+            "completedAt": completed_at.isoformat(),
+            "durationMs": duration_ms,
+            "trigger": {
+                "type": "${workflow.trigger?.type || 'httpEndpoint'}",
+                "data": trigger_data
+            },
+            "error": {
+                "message": str(e),
+                "type": type(e).__name__,
+                "stack": traceback.format_exc()
+            },
+            "nodeExecutions": [
+                {
+                    "nodeId": ne.node_id,
+                    "nodeName": ne.node_name,
+                    "nodeType": ne.node_type,
+                    "status": ne.status,
+                    "startedAt": ne.started_at,
+                    "completedAt": ne.completed_at,
+                    "durationMs": ne.duration_ms,
+                    "input": ne.input,
+                    "output": ne.output,
+                    "error": {
+                        "message": ne.error_message,
+                        "stack": ne.error_stack
+                    } if ne.error_message else None
+                }
+                for ne in ctx.node_executions
+            ],
+        }
+        
+        logger.error(f"[TEST MODE] Workflow failed (execution: {execution_id}): {e}")
+        
+        return execution_result
+`;
 }
 
 /**

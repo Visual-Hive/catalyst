@@ -54,8 +54,10 @@ export type PanelId = 'navigator' | 'editor' | 'properties';
 /**
  * Tab identifiers for the editor panel
  * Phase 4: Added 'logic' tab for visual logic editing
+ * Phase 2.5: Changed to 'workflow' tab for Catalyst workflow builder
+ * Task 2.12: Added 'executions' tab for execution history viewer
  */
-export type TabId = 'preview' | 'code' | 'console' | 'logic';
+export type TabId = 'preview' | 'code' | 'console' | 'logic' | 'workflow' | 'executions';
 
 /**
  * Panel size configuration
@@ -102,7 +104,7 @@ export function useLayout(): UseLayoutResult {
   // Active tab state with localStorage persistence
   const [activeTab, setActiveTabState] = useState<TabId>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.ACTIVE_TAB);
-    return (saved as TabId) || 'preview';
+    return (saved as TabId) || 'workflow'; // Default to workflow for Catalyst
   });
 
   // Panel sizes state with localStorage persistence

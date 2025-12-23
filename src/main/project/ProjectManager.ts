@@ -164,11 +164,10 @@ export class ProjectManager {
    * 1. Validate project name
    * 2. Validate project path
    * 3. Create project directory
-   * 4. Generate all template files
+   * 4. Generate template files (README.md)
    * 5. Initialize git (optional)
-   * 6. Install npm dependencies
-   * 7. Add to recent projects
-   * 8. Set as current project
+   * 6. Add to recent projects
+   * 7. Set as current project
    * 
    * @param params - Project creation parameters
    * @returns Promise with Result containing Project or Error
@@ -243,11 +242,12 @@ export class ProjectManager {
         await this.initializeGitRepo(projectPath);
       }
       
-      // 6. Install npm dependencies
-      console.log('[ProjectManager] Installing dependencies...');
-      await this.installDependencies(projectPath);
+      // Note: Skipping npm install - Catalyst projects don't need npm dependencies
+      // The .catalyst/ folder structure will be created by initializeCatalystStructure()
+      // in electron/ipc-handlers.ts after this method returns
       
-      // 7. Create Project object
+      // 6. Create Project object
+      // 6. Create Project object
       const project: Project = {
         id: uuidv4(),
         name: params.name,
@@ -258,10 +258,10 @@ export class ProjectManager {
         lastOpenedAt: new Date(),
       };
       
-      // 8. Add to recent projects
+      // 7. Add to recent projects
       await this.addToRecentProjects(project);
       
-      // 9. Set as current project
+      // 8. Set as current project
       this.currentProject = project;
       
       console.log('[ProjectManager] Project created successfully:', project.id);
@@ -284,19 +284,13 @@ export class ProjectManager {
   /**
    * Generate project files from template
    * 
-   * Creates all necessary files for a new React + Vite project:
-   * - package.json
-   * - vite.config.ts
-   * - tsconfig.json
-   * - index.html
-   * - src/App.tsx
-   * - src/main.tsx
-   * - .lowcode/manifest.json
-   * - .lowcode/settings.json
-   * - .gitignore
-   * - README.md
+   * Creates minimal files for a new Catalyst workflow project:
+   * - README.md (project documentation)
    * 
-   * TIMING: This should be fast (<1 second for all files)
+   * Note: .catalyst/ folder and manifest.json are created separately
+   * by initializeCatalystStructure() in ipc-handlers.ts
+   * 
+   * TIMING: This should be instant (<100ms)
    * 
    * @param projectPath - Absolute path to project directory
    * @param params - Project creation parameters
@@ -309,399 +303,42 @@ export class ProjectManager {
     projectPath: string,
     params: CreateProjectParams
   ): Promise<void> {
-    // We'll use a dedicated ProjectTemplates class in the next iteration
-    // For now, inline generation to keep things moving
-    
-    // Create .lowcode directory
-    const lowcodeDir = path.join(projectPath, '.lowcode');
-    await fs.mkdir(lowcodeDir, { recursive: true });
-    
-    // Create src directory
-    const srcDir = path.join(projectPath, 'src');
-    await fs.mkdir(srcDir, { recursive: true });
-    
-    // Create public directory
-    const publicDir = path.join(projectPath, 'public');
-    await fs.mkdir(publicDir, { recursive: true });
-    
-    // Generate manifest.json (empty for clean start)
-    // NOTE: Start with empty components - user will add their own
-    // Using actual HTML elements (div, button, etc.) rather than abstract types
-    const manifest = {
-      schemaVersion: '1.0.0',
-      level: 1,
-      metadata: {
-        projectName: params.name,
-        framework: params.framework,
-        createdAt: new Date().toISOString(),
-        modifiedAt: new Date().toISOString(),
-      },
-      // Start with no components - user adds them via the UI
-      components: {},
-    };
-    
-    await fs.writeFile(
-      path.join(lowcodeDir, 'manifest.json'),
-      JSON.stringify(manifest, null, 2),
-      'utf-8'
-    );
-    
-    // Generate settings.json
-    const settings = {
-      defaultPort: 5173,
-      autoSave: true,
-      theme: 'system',
-      showHiddenFiles: false,
-      strictMode: true,
-    };
-    
-    await fs.writeFile(
-      path.join(lowcodeDir, 'settings.json'),
-      JSON.stringify(settings, null, 2),
-      'utf-8'
-    );
-    
-    // Generate package.json
-    // Include Tailwind CSS and dependencies for styling
-    const packageJson = {
-      name: params.name,
-      private: true,
-      version: '0.1.0',
-      type: 'module',
-      scripts: {
-        dev: 'vite',
-        build: 'tsc && vite build',
-        preview: 'vite preview',
-      },
-      dependencies: {
-        react: '^18.2.0',
-        'react-dom': '^18.2.0',
-      },
-      devDependencies: {
-        '@types/react': '^18.2.43',
-        '@types/react-dom': '^18.2.17',
-        '@vitejs/plugin-react': '^4.2.1',
-        autoprefixer: '^10.4.16',
-        postcss: '^8.4.32',
-        tailwindcss: '^3.4.0',
-        typescript: '^5.3.3',
-        vite: '^5.0.8',
-      },
-    };
-    
-    await fs.writeFile(
-      path.join(projectPath, 'package.json'),
-      JSON.stringify(packageJson, null, 2),
-      'utf-8'
-    );
-    
-    // Generate vite.config.ts
-    const viteConfig = `import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5173,
-  },
-})
-`;
-    
-    await fs.writeFile(
-      path.join(projectPath, 'vite.config.ts'),
-      viteConfig,
-      'utf-8'
-    );
-    
-    // Generate tsconfig.json
-    const tsconfig = {
-      compilerOptions: {
-        target: 'ES2020',
-        useDefineForClassFields: true,
-        lib: ['ES2020', 'DOM', 'DOM.Iterable'],
-        module: 'ESNext',
-        skipLibCheck: true,
-        moduleResolution: 'bundler',
-        allowImportingTsExtensions: true,
-        resolveJsonModule: true,
-        isolatedModules: true,
-        noEmit: true,
-        jsx: 'react-jsx',
-        strict: true,
-        noUnusedLocals: true,
-        noUnusedParameters: true,
-        noFallthroughCasesInSwitch: true,
-      },
-      include: ['src'],
-      references: [{ path: './tsconfig.node.json' }],
-    };
-    
-    await fs.writeFile(
-      path.join(projectPath, 'tsconfig.json'),
-      JSON.stringify(tsconfig, null, 2),
-      'utf-8'
-    );
-    
-    // Generate tsconfig.node.json
-    const tsconfigNode = {
-      compilerOptions: {
-        composite: true,
-        skipLibCheck: true,
-        module: 'ESNext',
-        moduleResolution: 'bundler',
-        allowSyntheticDefaultImports: true,
-      },
-      include: ['vite.config.ts'],
-    };
-    
-    await fs.writeFile(
-      path.join(projectPath, 'tsconfig.node.json'),
-      JSON.stringify(tsconfigNode, null, 2),
-      'utf-8'
-    );
-    
-    // Generate index.html
-    // NOTE: Uses .jsx extension to match code generator output (not .tsx)
-    const indexHtml = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${params.name}</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
-</html>
-`;
-    
-    await fs.writeFile(
-      path.join(projectPath, 'index.html'),
-      indexHtml,
-      'utf-8'
-    );
-    
-    // Generate src/App.jsx (uses .jsx to match code generator output)
-    const appJsx = `import React from 'react'
-import './App.css'
-
-function App() {
-  return (
-    <div className="app-container">
-      <h1>Welcome to Catalyst</h1>
-      <p>Your project <strong>${params.name}</strong> is ready!</p>
-      <p className="info">
-        Start building your workflow by adding nodes in Catalyst.
-      </p>
-    </div>
-  )
-}
-
-export default App
-`;
-    
-    await fs.writeFile(
-      path.join(srcDir, 'App.jsx'),
-      appJsx,
-      'utf-8'
-    );
-    
-    // Generate src/main.jsx (uses .jsx to match code generator output)
-    const mainJsx = `import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App'
-import './index.css'
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
-`;
-    
-    await fs.writeFile(
-      path.join(srcDir, 'main.jsx'),
-      mainJsx,
-      'utf-8'
-    );
-    
-    // Generate src/App.css
-    const appCss = `.app-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-h1 {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-  color: #333;
-}
-
-p {
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
-  color: #666;
-}
-
-.info {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: #f0f0f0;
-  border-radius: 8px;
-}
-`;
-    
-    await fs.writeFile(
-      path.join(srcDir, 'App.css'),
-      appCss,
-      'utf-8'
-    );
-    
-    // Generate src/index.css with Tailwind directives
-    // IMPORTANT: These directives are required for Tailwind to work
-    const indexCss = `@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  min-height: 100vh;
-}
-
-#root {
-  width: 100%;
-}
-`;
-    
-    await fs.writeFile(
-      path.join(srcDir, 'index.css'),
-      indexCss,
-      'utf-8'
-    );
-    
-    // Generate tailwind.config.js
-    const tailwindConfig = `/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-`;
-    
-    await fs.writeFile(
-      path.join(projectPath, 'tailwind.config.js'),
-      tailwindConfig,
-      'utf-8'
-    );
-    
-    // Generate postcss.config.js
-    const postcssConfig = `export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}
-`;
-    
-    await fs.writeFile(
-      path.join(projectPath, 'postcss.config.js'),
-      postcssConfig,
-      'utf-8'
-    );
-    
-    // Generate .gitignore
-    const gitignore = `# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-`;
-    
-    await fs.writeFile(
-      path.join(projectPath, '.gitignore'),
-      gitignore,
-      'utf-8'
-    );
-    
-    // Generate README.md
+    // Generate README.md only
+    // The .catalyst/ folder structure is created by initializeCatalystStructure()
+    // in electron/ipc-handlers.ts after this method completes
     const readme = `# ${params.name}
 
-A workflow automation project built with Catalyst - an AI-powered visual workflow builder.
+A workflow automation project built with **Catalyst** - a visual workflow builder that generates production-ready Python code.
 
 ## Getting Started
 
-This project was created with Catalyst and generates Python + FastAPI code.
+Open this project in Catalyst to start building workflows:
 
-### Development
-
-\`\`\`bash
-npm run dev
-\`\`\`
-
-### Build
-
-\`\`\`bash
-npm run build
-\`\`\`
-
-### Preview
-
-\`\`\`bash
-npm run preview
-\`\`\`
+1. **Add workflow nodes** - Drag and drop nodes onto the canvas
+2. **Connect nodes** - Define your workflow logic
+3. **Generate code** - Catalyst automatically generates Python/FastAPI code
+4. **View output** - Check \`.catalyst/generated/\` for your Python files
 
 ## Project Structure
 
-- \`.lowcode/\` - Catalyst project configuration
-  - \`manifest.json\` - Component definitions
-  - \`settings.json\` - Project settings
-- \`src/\` - Application source code
-- \`public/\` - Static assets
+\`\`\`
+${params.name}/
+├── .catalyst/
+│   ├── manifest.json        # Workflow definitions
+│   └── generated/           # Generated Python code
+└── README.md                # This file
+\`\`\`
+
+## Workflows
+
+Your workflows are stored in \`.catalyst/manifest.json\` and automatically saved as you work.
+
+Generated Python code appears in \`.catalyst/generated/\` and is ready to run with FastAPI.
 
 ## Learn More
 
 - [Catalyst Documentation](https://github.com/Visual-Hive/catalyst)
-- [Vite Documentation](https://vitejs.dev/)
-- [React Documentation](https://react.dev/)
+- [Python FastAPI](https://fastapi.tiangolo.com/)
 `;
     
     await fs.writeFile(
@@ -915,7 +552,7 @@ npm run preview
    * 
    * VALIDATION:
    * - Checks if project directory exists
-   * - Checks if .lowcode folder exists within directory
+   * - Checks if .catalyst OR .lowcode folder exists (backward compatibility)
    * - Removes entries that fail validation
    * 
    * @returns Promise with array of recent projects
@@ -926,7 +563,7 @@ npm run preview
     try {
       const data = await this.loadRecentProjectsData();
       
-      // Validate each project path still exists AND has .lowcode folder
+      // Validate each project path still exists AND has .catalyst or .lowcode folder
       const validatedProjects: RecentProject[] = [];
       let hasInvalidProject = false;
       
@@ -935,14 +572,27 @@ npm run preview
           // Check if project directory exists
           await fs.access(project.path);
           
-          // Also check if .lowcode folder exists (project might be partially deleted)
+          // Check if .catalyst OR .lowcode folder exists (backward compatibility)
+          const catalystDir = path.join(project.path, '.catalyst');
           const lowcodeDir = path.join(project.path, '.lowcode');
-          await fs.access(lowcodeDir);
           
-          // Both exist, keep it
-          validatedProjects.push(project);
+          try {
+            await fs.access(catalystDir);
+            // .catalyst exists, keep it
+            validatedProjects.push(project);
+          } catch {
+            // .catalyst doesn't exist, try .lowcode for backward compatibility
+            try {
+              await fs.access(lowcodeDir);
+              // .lowcode exists, keep it
+              validatedProjects.push(project);
+            } catch {
+              // Neither exists, project is invalid
+              throw new Error('No .catalyst or .lowcode folder');
+            }
+          }
         } catch {
-          // Path or .lowcode doesn't exist anymore, skip it
+          // Path doesn't exist or has no valid folder
           console.log('[ProjectManager] Removed invalid recent project:', project.name, '-', project.path);
           hasInvalidProject = true;
         }
@@ -1072,8 +722,18 @@ npm run preview
       }
       
       // 3. Load manifest to get project metadata
-      const manifestPath = path.join(projectPath, '.lowcode', 'manifest.json');
-      const manifestContent = await fs.readFile(manifestPath, 'utf-8');
+      // Try .catalyst/manifest.json first, fall back to .lowcode/manifest.json
+      let manifestPath = path.join(projectPath, '.catalyst', 'manifest.json');
+      let manifestContent: string;
+      
+      try {
+        manifestContent = await fs.readFile(manifestPath, 'utf-8');
+      } catch {
+        // Try legacy .lowcode location
+        manifestPath = path.join(projectPath, '.lowcode', 'manifest.json');
+        manifestContent = await fs.readFile(manifestPath, 'utf-8');
+      }
+      
       const manifest = JSON.parse(manifestContent);
       
       // Extract project name from manifest (fallback to directory name)
@@ -1126,10 +786,11 @@ npm run preview
   }
 
   /**
-   * Load project settings from .lowcode/settings.json
+   * Load project settings from .catalyst/settings.json
    * 
    * Reads and parses the project settings file. If file doesn't exist
    * or is invalid, returns default settings.
+   * Backward compatible: tries .lowcode/settings.json if .catalyst version not found.
    * 
    * @param projectPath - Absolute path to project root directory
    * @returns Promise with ProjectSettings
@@ -1138,7 +799,8 @@ npm run preview
    */
   async loadProjectSettings(projectPath: string): Promise<ProjectSettings> {
     try {
-      const settingsPath = path.join(projectPath, '.lowcode', 'settings.json');
+      // Try .catalyst/settings.json first (new location)
+      const settingsPath = path.join(projectPath, '.catalyst', 'settings.json');
       const content = await fs.readFile(settingsPath, 'utf-8');
       const settings = JSON.parse(content);
       
@@ -1148,13 +810,28 @@ npm run preview
         ...settings,
       };
     } catch (error) {
-      console.warn('[ProjectManager] Settings file not found or invalid, using defaults');
-      return this.getDefaultSettings();
+      // Try legacy .lowcode location for backward compatibility
+      try {
+        const legacySettingsPath = path.join(projectPath, '.lowcode', 'settings.json');
+        const content = await fs.readFile(legacySettingsPath, 'utf-8');
+        const settings = JSON.parse(content);
+        
+        console.log('[ProjectManager] Loaded settings from legacy .lowcode location');
+        
+        return {
+          ...this.getDefaultSettings(),
+          ...settings,
+        };
+      } catch {
+        // Neither location exists, use defaults
+        console.warn('[ProjectManager] Settings file not found, using defaults');
+        return this.getDefaultSettings();
+      }
     }
   }
 
   /**
-   * Save project settings to .lowcode/settings.json
+   * Save project settings to .catalyst/settings.json
    * 
    * Validates and persists settings to disk. Validates port range
    * and merges with existing settings.
@@ -1189,15 +866,19 @@ npm run preview
         ...settings,
       };
       
-      // Write to disk
-      const settingsPath = path.join(projectPath, '.lowcode', 'settings.json');
+      // Ensure .catalyst directory exists
+      const catalystDir = path.join(projectPath, '.catalyst');
+      await fs.mkdir(catalystDir, { recursive: true });
+      
+      // Write to .catalyst/settings.json (new location)
+      const settingsPath = path.join(catalystDir, 'settings.json');
       await fs.writeFile(
         settingsPath,
         JSON.stringify(mergedSettings, null, 2),
         'utf-8'
       );
       
-      console.log('[ProjectManager] Settings saved successfully');
+      console.log('[ProjectManager] Settings saved successfully to .catalyst/settings.json');
     } catch (error) {
       console.error('[ProjectManager] Failed to save settings:', error);
       throw error;

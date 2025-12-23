@@ -201,6 +201,23 @@ export interface NodeCacheConfig {
 }
 
 /**
+ * Pinned data configuration for node testing
+ * Allows "freezing" JSON data on nodes for testing without running full workflow
+ * 
+ * @see .implementation/Catalyst_tasks/phase-2.5-developer-experience/task-2.13-node-pinning.md
+ */
+export interface PinnedDataConfig {
+  /** Whether pinned data is enabled (only used in TEST mode) */
+  enabled: boolean;
+  
+  /** The JSON data to use instead of executing node */
+  data: any;
+  
+  /** ISO timestamp when data was pinned */
+  timestamp: string;
+}
+
+/**
  * Base node interface - all nodes extend this
  * 
  * This is the foundation for all 55+ node types.
@@ -218,6 +235,7 @@ export interface BaseNode {
   cache?: NodeCacheConfig;       // Optional caching
   onError?: 'throw' | 'continue' | 'fallback';  // Error handling strategy
   fallbackValue?: any;           // Value to use if onError is 'fallback'
+  pinnedData?: PinnedDataConfig; // Pinned test data (Phase 2.5, Task 2.13)
 }
 
 /**
@@ -547,6 +565,38 @@ export interface RuntimeConfig {
     origins: string[];           // CORS origins
     methods: string[];           // Allowed methods
   };
+  executionReceiverPort?: number;  // Port for execution logging receiver (default: 3000)
+}
+
+/**
+ * Execution logging configuration
+ * Controls how and when workflow executions are logged
+ */
+export interface ExecutionLoggingConfig {
+  /** Master toggle for execution logging */
+  enabled: boolean;
+  
+  /** 
+   * Number of days to keep execution history
+   * 0 = keep forever
+   * Automatic cleanup runs on logger initialization
+   */
+  retentionDays: number;
+  
+  /** 
+   * Which executions to log
+   * - 'all': Log all executions (default)
+   * - 'success': Only log successful executions
+   * - 'error': Only log failed executions
+   */
+  logLevel: 'all' | 'success' | 'error';
+  
+  /** 
+   * Optional: Maximum executions to keep per workflow
+   * Oldest are deleted when limit is exceeded
+   * 0 or undefined = no limit
+   */
+  maxExecutionsPerWorkflow?: number;
 }
 
 /**
@@ -573,6 +623,7 @@ export interface CatalystManifest {
   globalVariables: Record<string, any>;
   workflows: Record<string, WorkflowDefinition>;
   sharedNodes?: Record<string, NodeDefinition>;  // Reusable nodes
+  executionLogging?: ExecutionLoggingConfig;     // Execution logging config (Phase 2.5)
 }
 
 // ============================================================
@@ -604,10 +655,16 @@ export function createEmptyManifest(): CatalystManifest {
       pythonVersion: '3.11',
       framework: 'fastapi',
       port: 8000,
+      executionReceiverPort: 3000,
     },
     secrets: {},
     globalVariables: {},
     workflows: {},
+    executionLogging: {
+      enabled: true,
+      retentionDays: 30,
+      logLevel: 'all',
+    },
   };
 }
 

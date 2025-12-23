@@ -1,14 +1,28 @@
 /**
  * @file ReactCodeGenerator.ts
- * @description Main orchestrator for React code generation (Level 1 - MVP)
+ * @description PHASE 2 FEATURE: React/Frontend Code Generator (Currently Dormant)
+ * 
+ * ⚠️ STATUS: ON STANDBY - Not used by current Catalyst workflow system
+ * 
+ * This file generates React/JSX code from component manifests (.lowcode/manifest.json).
+ * It's part of the Rise component builder system, preserved for Phase 2 full-stack integration.
+ * 
+ * PHASE 2 INTEGRATION:
+ * - Will be reactivated when frontend builder is enabled
+ * - Generates React components from visual component tree
+ * - Pairs with Python backend generation for full-stack apps
+ * 
+ * @see .implementation/future-tasks/phase-2-frontend-builder.md - Integration roadmap
+ * @see src/renderer/store/manifestStore.ts - Component manifest store (also dormant)
+ * @see src/core/codegen/python/ - Active backend code generation (Phase 1)
  *
- * @architecture Phase 3, Task 3.1 - React Code Generator
+ * @architecture Phase 3, Task 3.1 - React Code Generator (Original Rise)
  * @created 2025-11-27
  * @author AI (Cline) + Human Review
- * @confidence 8/10 - Coordinates all builders, integrates Prettier
+ * @confidence 8/10 - Proven system from Rise, functional but dormant
  *
- * @see docs/SCHEMA_LEVELS.md - Level 1 feature boundaries
- * @see docs/FILE_STRUCTURE_SPEC.md - Generated file structure
+ * @see docs/legacy-rise/SCHEMA_LEVELS.md - Level 1 feature boundaries
+ * @see docs/legacy-rise/FILE_STRUCTURE_SPEC.md - Generated file structure
  * @see src/core/codegen/types.ts - Type definitions
  *
  * PROBLEM SOLVED:
@@ -36,7 +50,7 @@
  * - Only static className (no conditional classes)
  *
  * @security-critical false
- * @performance-critical true - Target <100ms for 50 components
+ * @performance-critical true - Target <100ms for 50 components (when activated)
  */
 
 import * as prettier from 'prettier';

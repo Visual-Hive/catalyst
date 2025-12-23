@@ -380,10 +380,10 @@ export const NODE_REGISTRY: NodeRegistry = {
         type: 'select',
         required: true,
         options: [
-          { label: 'Llama 3.1 70B Versatile', value: 'llama-3.1-70b-versatile' },
+          { label: 'Llama 3.3 70B Versatile (Recommended)', value: 'llama-3.3-70b-versatile' },
           { label: 'Llama 3.1 8B Instant', value: 'llama-3.1-8b-instant' },
           { label: 'Mixtral 8x7B', value: 'mixtral-8x7b-32768' },
-          { label: 'Gemma 7B', value: 'gemma-7b-it' },
+          { label: 'Gemma 2 9B', value: 'gemma2-9b-it' },
         ],
         description: 'Choose the Groq model for inference',
       },

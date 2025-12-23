@@ -34,7 +34,7 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['electron', 'keytar', 'vite', 'esbuild', 'rollup', 'fsevents'],
+              external: ['electron', 'keytar', 'vite', 'esbuild', 'rollup', 'fsevents', 'better-sqlite3'],
             },
           },
           resolve: {

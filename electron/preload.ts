@@ -256,7 +256,7 @@ export interface ValidationError {
 /**
  * Workflow API interface
  * 
- * Controls Python code generation from workflow definitions.
+ * Controls Python code generation from workflow definitions and execution.
  */
 export interface WorkflowAPI {
   /** Generate Python code from workflow */
@@ -267,6 +267,157 @@ export interface WorkflowAPI {
   
   /** Get code preview without writing files */
   getCodePreview: (request: PreviewCodeRequest) => Promise<PreviewCodeResult>;
+  
+  /** Execute workflow locally (Phase 2.5, Task 2.18) */
+  execute: (workflowId: string, triggerData: any, manifest: any) => Promise<{ success: boolean; executionId?: string; error?: string }>;
+  
+  /** Stop running execution */
+  stop: (executionId: string) => Promise<{ success: boolean; error?: string }>;
+  
+  /** Get active executions */
+  getActive: () => Promise<{ success: boolean; executions?: string[]; error?: string }>;
+}
+
+/**
+ * Python Environment API interface
+ * 
+ * Controls Python environment validation and package management.
+ * Phase 2.5, Task 2.18
+ */
+export interface PythonAPI {
+  /** Check Python environment status (version, installed packages) */
+  check: () => Promise<{ success: boolean; data?: { pythonPath: string; version: string; packages: Record<string, boolean> }; error?: string }>;
+  
+  /** Install missing Python packages */
+  installDeps: (packages: string[]) => Promise<{ success: boolean; error?: string }>;
+}
+
+/**
+ * Catalyst Manifest API interface
+ * 
+ * Controls Catalyst workflow manifest persistence (.catalyst/manifest.json).
+ * Separate from legacy Rise manifest API.
+ */
+export interface CatalystManifestAPI {
+  /** Save Catalyst manifest to .catalyst/manifest.json */
+  save: (projectPath: string, manifest: any) => Promise<{ success: boolean; error?: string }>;
+  
+  /** Load Catalyst manifest from .catalyst/manifest.json */
+  load: (projectPath: string) => Promise<{ success: boolean; manifest?: any | null; error?: string; errorCode?: string }>;
+  
+  /** Initialize new Catalyst project with empty manifest */
+  initialize: (projectPath: string, projectName: string) => Promise<{ success: boolean; error?: string }>;
+}
+
+/**
+ * Execution API interface
+ * 
+ * Controls workflow execution history and logging.
+ * Phase 2.5, Task 2.11
+ */
+export interface ExecutionAPI {
+  /** Query execution history with optional filtering */
+  query: (options: ExecutionQueryOptions) => Promise<WorkflowExecution[]>;
+  
+  /** Get single execution by ID */
+  get: (executionId: string) => Promise<WorkflowExecution | null>;
+  
+  /** Get execution statistics for a workflow */
+  getStats: (workflowId: string) => Promise<ExecutionStats>;
+  
+  /** Delete a single execution */
+  delete: (executionId: string) => Promise<{ success: boolean }>;
+  
+  /** Clear all executions for a workflow */
+  clearWorkflow: (workflowId: string) => Promise<{ success: boolean; count: number }>;
+  
+  /** Manually trigger cleanup of old executions */
+  cleanup: (retentionDays: number) => Promise<{ success: boolean; count: number }>;
+  
+  /** Copy execution data to canvas (pin all node outputs) */
+  copyToCanvas: (executionId: string) => Promise<CopyToCanvasResult>;
+}
+
+/**
+ * Copy to canvas result
+ */
+export interface CopyToCanvasResult {
+  success: boolean;
+  data?: {
+    workflowId: string;
+    nodePins: Array<{
+      nodeId: string;
+      nodeName: string;
+      data: any;
+    }>;
+  };
+  error?: string;
+}
+
+/**
+ * Execution query options
+ */
+export interface ExecutionQueryOptions {
+  workflowId?: string;
+  status?: 'running' | 'success' | 'error';
+  limit?: number;
+  offset?: number;
+  sortOrder?: 'asc' | 'desc';
+}
+
+/**
+ * Workflow execution record
+ */
+export interface WorkflowExecution {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  status: 'running' | 'success' | 'error';
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  trigger: {
+    type: string;
+    data: Record<string, any>;
+  };
+  nodeExecutions: NodeExecution[];
+  error?: {
+    message: string;
+    stack?: string;
+    nodeId?: string;
+  };
+}
+
+/**
+ * Node execution record
+ */
+export interface NodeExecution {
+  nodeId: string;
+  nodeName: string;
+  nodeType: string;
+  status: 'pending' | 'running' | 'success' | 'error' | 'skipped';
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
+  input: Record<string, any>;
+  output?: Record<string, any>;
+  error?: {
+    message: string;
+    stack?: string;
+  };
+}
+
+/**
+ * Execution statistics
+ */
+export interface ExecutionStats {
+  workflowId: string;
+  totalExecutions: number;
+  successCount: number;
+  errorCount: number;
+  runningCount: number;
+  avgDurationMs: number;
+  lastExecutedAt?: string;
 }
 
 /**
@@ -396,6 +547,17 @@ export interface ElectronAPI {
   
   // Workflow system (Phase 2 LLM integration)
   workflow: WorkflowAPI;
+  
+  // Python environment system (Phase 2.5, Task 2.18)
+  python: PythonAPI;
+  
+  // Catalyst manifest system (Bug Fix - workflow persistence)
+  catalyst: {
+    manifest: CatalystManifestAPI;
+  };
+  
+  // Execution logging system (Phase 2.5)
+  execution: ExecutionAPI;
   
   // File operations (to be implemented in future tasks)
   // readFile: (filepath: string) => Promise<string>;
@@ -613,6 +775,77 @@ const electronAPI: ElectronAPI = {
     // Get code preview without writing files
     getCodePreview: (request: PreviewCodeRequest) =>
       ipcRenderer.invoke('workflow:get-code-preview', request),
+    
+    // Execute workflow locally (Phase 2.5, Task 2.18)
+    execute: (workflowId: string, triggerData: any, manifest: any) =>
+      ipcRenderer.invoke('workflow:execute', workflowId, triggerData, manifest),
+    
+    // Stop running execution
+    stop: (executionId: string) =>
+      ipcRenderer.invoke('workflow:stop', executionId),
+    
+    // Get active executions
+    getActive: () =>
+      ipcRenderer.invoke('workflow:get-active'),
+  },
+  
+  // Python environment system (Phase 2.5, Task 2.18)
+  python: {
+    // Check Python environment status
+    check: () =>
+      ipcRenderer.invoke('python:check'),
+    
+    // Install missing Python packages
+    installDeps: (packages: string[]) =>
+      ipcRenderer.invoke('python:install-deps', packages),
+  },
+  
+  // Catalyst manifest system (Bug Fix - workflow persistence)
+  catalyst: {
+    manifest: {
+      // Save Catalyst manifest to .catalyst/manifest.json
+      save: (projectPath: string, manifest: any) =>
+        ipcRenderer.invoke('catalyst:manifest:save', { projectPath, manifest }),
+      
+      // Load Catalyst manifest from .catalyst/manifest.json
+      load: (projectPath: string) =>
+        ipcRenderer.invoke('catalyst:manifest:load', { projectPath }),
+      
+      // Initialize new Catalyst project with empty manifest
+      initialize: (projectPath: string, projectName: string) =>
+        ipcRenderer.invoke('catalyst:manifest:initialize', { projectPath, projectName }),
+    },
+  },
+  
+  // Execution logging system (Phase 2.5, Task 2.11)
+  execution: {
+    // Query execution history with optional filtering
+    query: (options: ExecutionQueryOptions) =>
+      ipcRenderer.invoke('execution:query', options),
+    
+    // Get single execution by ID
+    get: (executionId: string) =>
+      ipcRenderer.invoke('execution:get', executionId),
+    
+    // Get execution statistics for a workflow
+    getStats: (workflowId: string) =>
+      ipcRenderer.invoke('execution:get-stats', workflowId),
+    
+    // Delete a single execution
+    delete: (executionId: string) =>
+      ipcRenderer.invoke('execution:delete', executionId),
+    
+    // Clear all executions for a workflow
+    clearWorkflow: (workflowId: string) =>
+      ipcRenderer.invoke('execution:clear-workflow', workflowId),
+    
+    // Manually trigger cleanup of old executions
+    cleanup: (retentionDays: number) =>
+      ipcRenderer.invoke('execution:cleanup', retentionDays),
+    
+    // Copy execution data to canvas (pin all node outputs)
+    copyToCanvas: (executionId: string) =>
+      ipcRenderer.invoke('execution:copy-to-canvas', executionId),
   },
   
   // File operations will be added in future tasks

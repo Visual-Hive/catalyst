@@ -18,10 +18,17 @@
  * @performance-critical false
  */
 
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import { app, BrowserWindow, Menu, shell, dialog } from 'electron';
 import path from 'path';
 import { setupIpcHandlers, cleanupPreviewServer, cleanupIpcHandlers } from './ipc-handlers';
 import { setupWorkflowGenerationHandlers, cleanupWorkflowGenerationHandlers } from './workflow-generation-handlers';
+import { setupCatalystManifestHandlers, cleanupCatalystManifestHandlers } from './catalyst-manifest-handlers';
+import { ExecutionLogger } from './execution-logger';
+import { ExecutionReceiver } from './execution-receiver';
+import { registerExecutionHandlers, cleanupExecutionHandlers } from './execution-handlers';
+import { registerWorkflowExecutionHandlers, cleanupWorkflowExecutionHandlers } from './workflow-execution-handlers';
+import { PythonEnvironment } from './python-environment';
+import { DEFAULT_EXECUTION_LOGGING_CONFIG } from '../src/core/execution/types';
 
 /**
  * Main application window instance
@@ -33,6 +40,13 @@ let mainWindow: BrowserWindow | null = null;
  * Flag to track if app is in development mode
  */
 const isDevelopment = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+/**
+ * Execution logging system instances
+ * Initialized during app startup
+ */
+let executionLogger: ExecutionLogger | null = null;
+let executionReceiver: ExecutionReceiver | null = null;
 
 /**
  * Creates the main application window with secure configuration
@@ -257,6 +271,85 @@ app.whenReady().then(async () => {
   
   // Set up workflow generation handlers (Phase 2 LLM integration)
   setupWorkflowGenerationHandlers();
+  
+  // Set up Catalyst manifest persistence handlers (Bug Fix)
+  setupCatalystManifestHandlers();
+  
+  // Initialize execution logging system (Phase 2.5)
+  // TODO: Load config from current project manifest when project management is implemented
+  // For now, use default config
+  try {
+    console.log('[INFO] Initializing execution logging system...');
+    console.log('[INFO] User data directory:', app.getPath('userData'));
+    
+    // Initialize ExecutionLogger with default config
+    executionLogger = ExecutionLogger.getInstance(DEFAULT_EXECUTION_LOGGING_CONFIG);
+    console.log('[INFO] ExecutionLogger initialized successfully');
+    
+    // Register IPC handlers for execution queries
+    registerExecutionHandlers(executionLogger);
+    console.log('[INFO] Execution IPC handlers registered');
+    
+    // Start execution receiver (separate try-catch so handler registration isn't blocked)
+    try {
+      const receiverPort = 3000; // TODO: Get from project manifest config
+      executionReceiver = new ExecutionReceiver(executionLogger);
+      const result = await executionReceiver.start(receiverPort);
+      
+      if (result.success) {
+        console.log(`[INFO] Execution receiver started on ${result.url}`);
+      } else {
+        console.error(`[ERROR] Failed to start execution receiver: ${result.error}`);
+        // Don't block app startup - receiver is for deployed workflows
+        console.warn('[WARN] Execution receiver unavailable, but local execution will still work');
+      }
+    } catch (receiverError) {
+      console.error('[ERROR] Exception starting execution receiver:', receiverError);
+      console.warn('[WARN] Execution receiver unavailable, but local execution will still work');
+    }
+  } catch (error) {
+    console.error('[ERROR] Failed to initialize execution logging:', error);
+    console.error('[ERROR] Stack trace:', error instanceof Error ? error.stack : 'N/A');
+    
+    // Show error to user but don't crash the app
+    dialog.showErrorBox(
+      'Execution Logging Initialization Failed',
+      `Failed to initialize execution logging system.\n\n${error instanceof Error ? error.message : String(error)}\n\nExecution history will not be available.`
+    );
+  }
+  
+  // Register workflow execution handlers (Phase 2.5, Task 2.18)
+  registerWorkflowExecutionHandlers();
+  
+  // Check Python environment on startup (Phase 2.5, Task 2.18)
+  // This validates Python installation and caches the result for 5 minutes
+  // Non-blocking - failures won't prevent app from starting
+  try {
+    console.log('[INFO] Validating Python environment...');
+    const pythonEnv = PythonEnvironment.getInstance();
+    const status = await pythonEnv.getStatus();
+    
+    if (status.isValid) {
+      const versionStr = status.pythonVersion 
+        ? `${status.pythonVersion.major}.${status.pythonVersion.minor}.${status.pythonVersion.patch}`
+        : 'unknown';
+      console.log(`[INFO] Python ${versionStr} validated successfully`);
+      
+      // Check for missing packages
+      if (status.missingPackages.length > 0) {
+        console.warn(`[WARN] Missing Python packages: ${status.missingPackages.join(', ')}`);
+        console.warn('[WARN] Workflow execution will fail until packages are installed');
+      } else {
+        console.log('[INFO] All required Python packages are installed');
+      }
+    } else {
+      console.warn('[WARN] Python environment validation failed:', status.error);
+      console.warn('[WARN] Workflow execution features will not be available');
+    }
+  } catch (error) {
+    console.error('[ERROR] Failed to validate Python environment:', error);
+    console.warn('[WARN] Workflow execution features may not work correctly');
+  }
 
   // Create application menu
   createApplicationMenu();
@@ -298,6 +391,18 @@ app.on('before-quit', async (event) => {
   event.preventDefault();
   
   try {
+    // Clean up execution logging system
+    if (executionReceiver) {
+      await executionReceiver.stop();
+    }
+    if (executionLogger) {
+      executionLogger.close();
+    }
+    cleanupExecutionHandlers();
+    
+    // Clean up workflow execution handlers
+    cleanupWorkflowExecutionHandlers();
+    
     // Clean up preview server (kills any running Vite process)
     await cleanupPreviewServer();
     
@@ -306,6 +411,9 @@ app.on('before-quit', async (event) => {
     
     // Clean up workflow generation handlers
     cleanupWorkflowGenerationHandlers();
+    
+    // Clean up Catalyst manifest handlers
+    cleanupCatalystManifestHandlers();
     
     console.log('[INFO] Cleanup complete, quitting...');
   } catch (error) {

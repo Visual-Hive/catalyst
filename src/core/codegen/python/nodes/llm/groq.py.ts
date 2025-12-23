@@ -109,11 +109,10 @@ FEATURES:
 - Usage Tracking: Token counts for cost monitoring
 
 SUPPORTED MODELS:
-- llama-3.1-70b-versatile: 70B params, highest quality, 500+ tok/s (DEFAULT)
+- llama-3.3-70b-versatile: 70B params, highest quality, 500+ tok/s (DEFAULT)
 - llama-3.1-8b-instant: 8B params, ultra fast, 800+ tok/s, great for simple tasks
 - mixtral-8x7b-32768: 47B params, MoE architecture, 600+ tok/s, excellent reasoning
-- llama3-70b-8192: Llama 3 70B, 500+ tok/s
-- llama3-8b-8192: Llama 3 8B, 800+ tok/s
+- gemma2-9b-it: 9B params, efficient, 700+ tok/s
 
 SPEED COMPARISON (Approximate):
 | Provider           | First Token | Tokens/Sec | 100 Token Response |
@@ -252,11 +251,20 @@ async def execute_groq_completion(
             # - max_keepalive_connections: 10
         )
         
+        # Convert simple prompt to messages array if needed
+        # The UI form collects a "prompt" field, but Groq API expects "messages" array
+        # This allows users to use the simple UI while supporting advanced message arrays
+        if "messages" not in config and "prompt" in config:
+            config["messages"] = [
+                {"role": "user", "content": config["prompt"]}
+            ]
+            logger.debug("Converted simple prompt to messages array for Groq API")
+        
         # Build request parameters
         # Start with required parameters
         request_params = {
-            # Model selection - default to Llama 3.1 70B (best quality on Groq)
-            "model": config.get("model", "llama-3.1-70b-versatile"),
+            # Model selection - default to Llama 3.3 70B (best quality on Groq)
+            "model": config.get("model", "llama-3.3-70b-versatile"),
             
             # Messages array - REQUIRED
             # Format: [{"role": "system"|"user"|"assistant", "content": str}]
@@ -328,19 +336,15 @@ async def execute_groq_completion(
         # API key is invalid or missing
         # User needs to check their GROQ_API_KEY secret
         logger.error(f"Groq authentication failed: {e}")
-        raise AuthenticationError(
-            "Invalid Groq API key. Please check your GROQ_API_KEY secret. "
-            "Get your API key at: https://console.groq.com/keys"
-        ) from e
+        logger.error("Please check your GROQ_API_KEY secret. Get your API key at: https://console.groq.com/keys")
+        raise
     
     except RateLimitError as e:
         # Rate limit exceeded (429 status)
         # Groq has generous limits, but they can be hit with high volume
         logger.error(f"Groq rate limit exceeded: {e}")
-        raise RateLimitError(
-            f"Groq rate limit exceeded. Please retry after {getattr(e, 'retry_after', 'unknown')} seconds. "
-            "Groq has generous limits, but high-volume applications may need to implement rate limiting."
-        ) from e
+        logger.error("Please retry after some time. Groq has generous limits, but high-volume applications may need to implement rate limiting.")
+        raise
     
     except APIError as e:
         # Other API errors (context length, invalid params, etc.)
@@ -352,20 +356,13 @@ async def execute_groq_completion(
         
         if "maximum context length" in error_message.lower() or "context" in error_message.lower():
             # Context window exceeded
-            raise APIError(
-                f"Context length exceeded: {error_message}. "
-                "Reduce message length or use a model with larger context window. "
-                "Groq models support 8K-32K context depending on model."
-            ) from e
-        elif "model" in error_message.lower() and "not found" in error_message.lower():
-            # Invalid model specified
-            raise APIError(
-                f"Model not found: {error_message}. "
-                "Supported Groq models: llama-3.1-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768"
-            ) from e
+            logger.error("Context length exceeded. Reduce message length or use a model with larger context window.")
+        elif "model" in error_message.lower() and ("not found" in error_message.lower() or "decommissioned" in error_message.lower()):
+            # Invalid model specified or decommissioned
+            logger.error("Model not found or decommissioned. Supported Groq models: llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768, gemma2-9b-it")
         
-        # Generic API error
-        raise APIError(f"Groq API error: {error_message}") from e
+        # Re-raise original exception
+        raise
     
     except Exception as e:
         # Catch-all for unexpected errors
@@ -487,9 +484,18 @@ async def stream_groq_completion(
             api_key=ctx.secrets["GROQ_API_KEY"],
         )
         
+        # Convert simple prompt to messages array if needed
+        # The UI form collects a "prompt" field, but Groq API expects "messages" array
+        # This allows users to use the simple UI while supporting advanced message arrays
+        if "messages" not in config and "prompt" in config:
+            config["messages"] = [
+                {"role": "user", "content": config["prompt"]}
+            ]
+            logger.debug("Converted simple prompt to messages array for Groq streaming")
+        
         # Build request parameters (same as non-streaming)
         request_params = {
-            "model": config.get("model", "llama-3.1-70b-versatile"),
+            "model": config.get("model", "llama-3.3-70b-versatile"),
             "messages": config["messages"],
             "stream": True,  # Enable streaming for ultra-fast token delivery
         }
@@ -563,31 +569,31 @@ async def stream_groq_completion(
             )
     
     except AuthenticationError as e:
+        # API key is invalid or missing
         logger.error(f"Groq authentication failed during streaming: {e}")
-        raise AuthenticationError(
-            "Invalid Groq API key. Please check your GROQ_API_KEY secret. "
-            "Get your API key at: https://console.groq.com/keys"
-        ) from e
+        logger.error("Please check your GROQ_API_KEY secret. Get your API key at: https://console.groq.com/keys")
+        raise
     
     except RateLimitError as e:
+        # Rate limit exceeded during streaming
         logger.error(f"Groq rate limit exceeded during streaming: {e}")
-        raise RateLimitError(
-            f"Groq rate limit exceeded during streaming. "
-            f"Please retry after {getattr(e, 'retry_after', 'unknown')} seconds."
-        ) from e
+        logger.error("Please retry after some time. Consider implementing rate limiting for high-volume streaming.")
+        raise
     
     except APIError as e:
+        # Other API errors during streaming
         logger.error(f"Groq API error during streaming: {e}")
         
-        # Provide specific error messages
+        # Check for common error types and provide helpful messages
         error_message = str(e)
         
         if "maximum context length" in error_message.lower() or "context" in error_message.lower():
-            raise APIError(
-                f"Context length exceeded during streaming: {error_message}"
-            ) from e
+            logger.error("Context length exceeded during streaming. Reduce message length or use a model with larger context window.")
+        elif "model" in error_message.lower() and ("not found" in error_message.lower() or "decommissioned" in error_message.lower()):
+            logger.error("Model not found or decommissioned. Supported Groq models: llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768, gemma2-9b-it")
         
-        raise APIError(f"Groq streaming error: {error_message}") from e
+        # Re-raise original exception
+        raise
     
     except Exception as e:
         logger.error(f"Unexpected error during Groq streaming: {e}")

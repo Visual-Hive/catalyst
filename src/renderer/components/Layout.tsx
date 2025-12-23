@@ -126,19 +126,9 @@ export function Layout() {
             <EditorPanel />
           </Panel>
 
-          {/* Resize Handle between Editor and Properties */}
-          <PanelResizeHandle className="w-1 bg-gray-300 hover:bg-blue-500 transition-colors cursor-col-resize" />
-
-          {/* Properties Panel (Right) */}
-          <Panel
-            id="properties"
-            defaultSize={25}
-            minSize={15}
-            maxSize={40}
-            order={3}
-          >
-            <PropertiesPanel />
-          </Panel>
+          {/* REMOVED: Properties Panel - WorkflowCanvas has its own WorkflowPropertiesPanel */}
+          {/* This was the RISE properties panel for React components */}
+          {/* Catalyst workflows use WorkflowPropertiesPanel built into WorkflowCanvas */}
         </PanelGroup>
       </div>
 

@@ -41,17 +41,44 @@ Build a UI for browsing and inspecting past workflow executions. This makes the 
 ## Milestones
 
 ### Milestone 1: Design UI Architecture
-**Confidence:** 8/10  
-**Status:** 🔵 Not Started  
+**Date:** 2025-12-21  
+**Confidence:** 9/10  
+**Status:** ✅ Complete  
 
 #### Design Decisions
 
 | Decision | Options Considered | Choice Made | Rationale | Confidence |
 |----------|-------------------|-------------|-----------|------------|
-| Layout | Modal, sidebar, separate tab | Sidebar panel | Keeps context, doesn't block canvas | 8/10 |
-| List vs Timeline | List only, timeline only, tabs | Tabs with both | Flexibility for different use cases | 9/10 |
-| Virtual scrolling | All items, virtual scroll | Virtual for >50 items | Performance with large history | 8/10 |
-| Auto-refresh | Polling, manual, WebSocket | Manual refresh button | Simple, no overhead, user control | 9/10 |
+| Layout | Modal, sidebar, separate tab | **Separate tab view** | Full-screen space for data, clear separation from canvas | 9/10 |
+| Detail views | Timeline only, list only, tabs | **Both with tabs** | Timeline for visual, table for sortable data | 9/10 |
+| Virtual scrolling | All items, virtual scroll | **Virtual for >50 items** | Performance with large history | 8/10 |
+| Auto-refresh | Polling, manual, WebSocket | **Optional 5s polling** | User control via checkbox, pauses when hidden | 9/10 |
+| Export | None, JSON only, both | **CSV for list + JSON for execution** | CSV for analysis, JSON for debugging | 9/10 |
+
+#### Architecture Summary
+
+**Layout Structure:**
+- Separate tab view (Canvas | History) for full-screen data display
+- Split panel: Execution list (left 320px) + Details (right flex-1)
+- Toolbar with refresh, auto-refresh toggle, and export buttons
+
+**Views:**
+- **Timeline View**: Visual flow with expandable nodes showing input/output
+- **List View**: Sortable table with columns (name, status, duration)
+
+**Features:**
+- Status filtering (All/Success/Error) with count badges
+- Auto-refresh checkbox (5-second interval, pauses when tab hidden)
+- Export list to CSV (all filtered executions)
+- Export execution to JSON (complete execution data)
+- Virtual scrolling for 50+ executions
+- Relative timestamps ("2 minutes ago")
+
+**Performance:**
+- Debounced filtering (immediate UI update)
+- Virtual scrolling via react-window
+- Auto-refresh pauses on visibility change
+- Lazy load node data on expansion
 
 ---
 

@@ -112,6 +112,9 @@ export function WorkflowNode({ data, selected }: WorkflowNodeProps) {
   // Determine if this is a stub node (not yet implemented)
   const isStub = !metadata.implemented;
   
+  // Check if node has pinned data (Phase 2.5, Task 2.13)
+  const isPinned = data.pinnedData?.enabled || false;
+  
   // Get node display name (use custom name if set, otherwise metadata name)
   const displayName = data.name || metadata.name;
   
@@ -119,7 +122,17 @@ export function WorkflowNode({ data, selected }: WorkflowNodeProps) {
   const stubStyle = isStub ? { opacity: 0.7, filter: 'grayscale(50%)' } : {};
   
   return (
-    <div style={stubStyle} className="workflow-node">
+    <div style={stubStyle} className="workflow-node relative">
+      {/* Pin icon badge for pinned nodes (Phase 2.5, Task 2.13) */}
+      {isPinned && (
+        <div 
+          className="absolute -top-2 -right-2 bg-purple-500 text-white rounded-full p-1 z-10 shadow-md"
+          title="Test data pinned"
+        >
+          📌
+        </div>
+      )}
+      
       {/* 
         Render dynamic input handles
         Each input gets a Handle component on the left side

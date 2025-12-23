@@ -62,6 +62,14 @@ function getFileIcon(name: string) {
   // Extract extension
   const ext = name.split('.').pop()?.toLowerCase() || '';
   
+  // Python files (Catalyst generated code)
+  if (ext === 'py') {
+    return {
+      icon: DocumentTextIcon,
+      color: 'text-yellow-600',
+    };
+  }
+  
   // TypeScript/JavaScript files
   if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx') {
     return {
@@ -146,6 +154,7 @@ function getFileIcon(name: string) {
  * Folders show different icons based on expanded state.
  * 
  * FILE TYPE COLORS:
+ * - Python: Yellow (Catalyst generated code)
  * - TypeScript/JavaScript: Blue
  * - JSON: Green
  * - CSS: Purple
@@ -178,9 +187,9 @@ export function FileIcon({
 }: FileIconProps) {
   // Handle directories
   if (isDirectory) {
-    // Special color for .lowcode directory
-    const isLowcodeDir = name === '.lowcode';
-    const folderColor = isLowcodeDir ? 'text-blue-600' : 'text-yellow-500';
+    // Special color for .catalyst directory (Catalyst project folder)
+    const isCatalystDir = name === '.catalyst';
+    const folderColor = isCatalystDir ? 'text-blue-600' : 'text-yellow-500';
     
     // Use different icon for expanded vs collapsed
     const FolderIconComponent = isExpanded ? FolderOpenIcon : FolderIcon;

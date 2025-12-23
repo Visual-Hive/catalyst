@@ -80,6 +80,10 @@ export async function setupIpcHandlers(): Promise<void> {
       
       if (result.success) {
         console.log('[IPC] Project created successfully:', result.data.id);
+        
+        // NOTE: Catalyst structure (.catalyst/ folder) will be created automatically
+        // when the user first saves a workflow. No need to create it during project setup.
+        
         return {
           success: true,
           project: result.data,
@@ -534,7 +538,9 @@ export async function setupIpcHandlers(): Promise<void> {
   });
 
   // ===== Manifest Handlers (Task 2.2A) =====
-  registerManifestHandlers();
+  // NOTE: Rise component manifest handlers (.lowcode/) are DISABLED until Phase 2 Frontend Builder
+  // Catalyst workflow manifests (.catalyst/) are handled by catalyst-manifest-handlers.ts
+  // registerManifestHandlers();
 
   // ===== AI Handlers (Task 2.4A) =====
   registerAIHandlers();
@@ -569,11 +575,11 @@ export function cleanupIpcHandlers(): void {
   ipcMain.removeHandler(PreviewChannels.RESTART);
   ipcMain.removeHandler(PreviewChannels.STATUS);
   
-  // Manifest handlers (Task 2.2A)
-  ipcMain.removeHandler('manifest:load');
-  ipcMain.removeHandler('manifest:save');
-  ipcMain.removeHandler('manifest:exists');
-  ipcMain.removeHandler('manifest:initialize');
+  // Manifest handlers (Task 2.2A) - DISABLED until Phase 2
+  // ipcMain.removeHandler('manifest:load');
+  // ipcMain.removeHandler('manifest:save');
+  // ipcMain.removeHandler('manifest:exists');
+  // ipcMain.removeHandler('manifest:initialize');
   
   // AI handlers (Task 2.4A)
   cleanupAIHandlers();

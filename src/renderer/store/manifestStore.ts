@@ -1,16 +1,48 @@
 /**
  * @file manifestStore.ts
- * @description Zustand store for managing Rise manifest and component tree
+ * @description PHASE 2 FEATURE: Frontend Component Builder (Currently Dormant)
  * 
- * @architecture Phase 2, Task 2.1 - Component Tree UI
+ * ⚠️ STATUS: ON STANDBY - Not used by current Catalyst workflow system
+ * 
+ * CATALYST ARCHITECTURE - DUAL SYSTEM:
+ * 
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │ PHASE 1 (CURRENT): Backend Workflow Builder                     │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │ Store:     workflowStore.ts                                     │
+ * │ Manifest:  .catalyst/manifest.json                              │
+ * │ UI:        WorkflowCanvas (node-based visual editor)            │
+ * │ Output:    Python/FastAPI backend code                          │
+ * │ Status:    ✅ ACTIVE                                            │
+ * └─────────────────────────────────────────────────────────────────┘
+ * 
+ * ┌─────────────────────────────────────────────────────────────────┐
+ * │ PHASE 2 (FUTURE): Frontend Component Builder                    │
+ * ├─────────────────────────────────────────────────────────────────┤
+ * │ Store:     manifestStore.ts (THIS FILE)                         │
+ * │ Manifest:  .lowcode/manifest.json                               │
+ * │ UI:        Component Tree (hierarchy-based editor)              │
+ * │ Output:    React/JSX frontend code                              │
+ * │ Status:    🔄 ON STANDBY (awaiting integration)                │
+ * └─────────────────────────────────────────────────────────────────┘
+ * 
+ * FULL-STACK INTEGRATION VISION:
+ * - Single project with BOTH manifest types
+ * - Backend workflows → Python APIs
+ * - Frontend components → React UI  
+ * - Unified code generation
+ * - Type-safe integration between layers
+ * 
+ * @see .implementation/future-tasks/phase-2-frontend-builder.md - Integration roadmap
+ * @see docs/legacy-rise/ - Original Rise component builder documentation
+ * @see src/renderer/store/workflowStore.ts - Active workflow system (Phase 1)
+ * 
+ * @architecture Phase 2, Task 2.1 - Component Tree UI (Original Rise)
  * @created 2025-11-25
  * @author AI (Cline) + Human Review
- * @confidence 9/10 - Follows established Zustand patterns
+ * @confidence 9/10 - Proven system from Rise, dormant but functional
  * 
- * @see src/core/manifest/types.ts - Type definitions
- * @see src/renderer/store/projectStore.ts - Similar pattern
- * 
- * PROBLEM SOLVED:
+ * ORIGINAL PROBLEM SOLVED:
  * - Centralized manifest state management
  * - Component CRUD operations with validation
  * - Tree expansion and selection state
@@ -32,7 +64,7 @@
  * 
  * @performance Debounced saves, memoized tree computation
  * @security-critical false - operates on local manifest file
- * @performance-critical true - called frequently during editing
+ * @performance-critical true - will be called frequently during editing (when activated)
  */
 
 import { create } from 'zustand';
@@ -416,6 +448,10 @@ export const useManifestStore = create<ManifestState>()(
      * 
      * Creates .lowcode folder and empty manifest file.
      * Called from MissingManifestDialog when user chooses to initialize.
+     * 
+     * NOTE: Phase 2 feature - currently supports legacy Rise component manifests.
+     * Will be updated to support both .catalyst/ (workflows) and .lowcode/ (components)
+     * when Phase 2 frontend builder is activated.
      * 
      * @param projectPath - Absolute path to project directory
      * @param projectName - Name for the project

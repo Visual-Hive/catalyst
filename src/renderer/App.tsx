@@ -37,6 +37,7 @@ import { AIPromptDialog } from './components/AIGeneration';
 import { useProjectStore } from './store/projectStore';
 import { usePreviewStore } from './store/previewStore';
 import { useManifestStore } from './store/manifestStore';
+import { useWorkflowStore } from './store/workflowStore';
 import { useAIStore } from './store/aiStore';
 import { useGenerationStore } from './store/generationStore';
 import { GenerationService } from './services/GenerationService';
@@ -45,7 +46,7 @@ import { GenerationService } from './services/GenerationService';
 import { WorkflowCanvasTest } from './components/WorkflowCanvas/WorkflowCanvasTest';
 
 // TEMPORARY: Set to true to test WorkflowCanvas, false for normal app
-const SHOW_WORKFLOW_TEST = true;
+const SHOW_WORKFLOW_TEST = false;
 
 /**
  * Root application component
@@ -82,6 +83,10 @@ function App() {
   
   // Get manifest store actions (Task 2.2B)
   const clearManifest = useManifestStore((state) => state.clearManifest);
+  
+  // Get workflow store actions (Catalyst manifest)
+  const loadWorkflowManifest = useWorkflowStore((state) => state.loadManifest);
+  const resetWorkflowManifest = useWorkflowStore((state) => state.resetManifest);
   
   // Get AI store actions (Task 2.4E)
   const initializeAI = useAIStore((state) => state.initialize);
@@ -124,6 +129,7 @@ function App() {
       if (previousPath) {
         stopPreview();
         clearManifest(); // Task 2.2B: Clear manifest on project close
+        resetWorkflowManifest(); // Clear Catalyst manifest on project close
         cleanupAI(); // Task 2.4E: Cleanup AI on project close
         
         // Task 3.3: Cleanup generation service
@@ -135,6 +141,30 @@ function App() {
       if (currentPath) {
         startPreview(currentPath);
         initializeAI(currentPath); // Task 2.4E: Initialize AI on project open
+        
+        // Load Catalyst manifest from .catalyst/manifest.json
+        // This handles workflow persistence on project open
+        (async () => {
+          try {
+            const electronAPI = (window as any).electronAPI;
+            const result = await electronAPI.catalyst.manifest.load(currentPath);
+            
+            if (result.success && result.manifest) {
+              console.log('[App] Loaded Catalyst manifest:', result.manifest);
+              loadWorkflowManifest(result.manifest);
+            } else if (result.error?.includes('ENOENT')) {
+              // Manifest doesn't exist yet - this is okay for new projects
+              console.log('[App] No Catalyst manifest found, will create on first save');
+              resetWorkflowManifest();
+            } else {
+              console.error('[App] Failed to load Catalyst manifest:', result.error);
+              resetWorkflowManifest();
+            }
+          } catch (error) {
+            console.error('[App] Error loading Catalyst manifest:', error);
+            resetWorkflowManifest();
+          }
+        })();
         
         // Task 3.3: Initialize generation service and mark as watching
         // The service will start listening for manifest changes automatically

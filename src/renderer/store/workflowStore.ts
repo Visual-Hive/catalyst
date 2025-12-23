@@ -64,6 +64,12 @@ import {
 } from '../../core/workflow/types';
 
 /**
+ * electronAPI helper to access the window.electronAPI with proper typing
+ * The preload script exposes this API via contextBridge
+ */
+const electronAPI = (window as any).electronAPI;
+
+/**
  * Debounce delay for auto-save operations (milliseconds)
  * Prevents excessive file writes during rapid editing
  */
@@ -257,6 +263,43 @@ export interface WorkflowState {
     value: any
   ) => void;
   
+  /**
+   * Pin data on a node for testing
+   * 
+   * Stores JSON data that will be used instead of executing the node.
+   * Pinned data is only used in TEST mode, not in production.
+   * 
+   * @param workflowId - Workflow containing the node
+   * @param nodeId - Node ID to pin data on
+   * @param data - JSON data to pin
+   * 
+   * @example
+   * ```typescript
+   * pinNodeData(workflowId, nodeId, {
+   *   content: "Sample AI response",
+   *   model: "claude-3-5-sonnet-20241022"
+   * });
+   * ```
+   * 
+   * @see .implementation/Catalyst_tasks/phase-2.5-developer-experience/task-2.13-node-pinning.md
+   */
+  pinNodeData: (workflowId: string, nodeId: string, data: any) => void;
+  
+  /**
+   * Unpin data from a node
+   * 
+   * Removes pinned data so the node will execute normally.
+   * 
+   * @param workflowId - Workflow containing the node
+   * @param nodeId - Node ID to unpin data from
+   * 
+   * @example
+   * ```typescript
+   * unpinNodeData(workflowId, nodeId);
+   * ```
+   */
+  unpinNodeData: (workflowId: string, nodeId: string) => void;
+  
   // ============================================================
   // ACTIONS - EDGES
   // ============================================================
@@ -433,21 +476,37 @@ export const useWorkflowStore = create<WorkflowState>()(
           return new Promise<void>((resolve, reject) => {
             saveTimeout = setTimeout(async () => {
               try {
-                // TODO: Phase 0.5 - Wire up IPC for file save
-                // const result = await window.electronAPI.workflow.save(
-                //   projectPath,
-                //   state.manifest
-                // );
+                // Get current project path from projectStore
+                const { useProjectStore } = await import('./projectStore');
+                const currentProject = useProjectStore.getState().currentProject;
                 
-                // For now, just log and mark as saved
-                console.log('[WorkflowStore] Manifest would be saved:', state.manifest);
+                if (!currentProject || !currentProject.path) {
+                  console.warn('[WorkflowStore] Cannot save: No project loaded');
+                  reject(new Error('No project loaded'));
+                  return;
+                }
                 
-                // Mark as clean (no unsaved changes)
-                set((state) => {
-                  state.isDirty = false;
-                });
+                // Save manifest via IPC using new Catalyst manifest API
+                const result = await electronAPI.catalyst.manifest.save(
+                  currentProject.path,
+                  state.manifest
+                );
                 
-                resolve();
+                if (result.success) {
+                  console.log('[WorkflowStore] Manifest saved successfully to', result.path);
+                  
+                  // Mark as clean (no unsaved changes)
+                  set((state) => {
+                    state.isDirty = false;
+                  });
+                  
+                  resolve();
+                } else {
+                  // Save failed
+                  const errorMsg = result.error || 'Unknown error during save';
+                  console.error('[WorkflowStore] Failed to save manifest:', errorMsg);
+                  reject(new Error(errorMsg));
+                }
               } catch (error) {
                 const message = error instanceof Error ? error.message : 'Unknown error';
                 console.error('[WorkflowStore] Error saving manifest:', message);
@@ -750,6 +809,74 @@ export const useWorkflowStore = create<WorkflowState>()(
               const leafKey = pathParts[pathParts.length - 1];
               current[leafKey] = value;
             }
+            
+            // Update manifest timestamp
+            state.manifest!.metadata.updatedAt = new Date().toISOString();
+            
+            // Mark as dirty
+            state.isDirty = true;
+          });
+          
+          // Trigger auto-save
+          get().saveManifest().catch(console.error);
+        },
+        
+        pinNodeData: (workflowId: string, nodeId: string, data: any) => {
+          const state = get();
+          
+          // Cannot pin if workflow or node doesn't exist
+          if (
+            !state.manifest ||
+            !state.manifest.workflows[workflowId] ||
+            !state.manifest.workflows[workflowId].nodes[nodeId]
+          ) {
+            console.warn(
+              `[WorkflowStore] Cannot pin data: Workflow or node not found: ${workflowId}/${nodeId}`
+            );
+            return;
+          }
+          
+          set((state) => {
+            const node = state.manifest!.workflows[workflowId].nodes[nodeId];
+            
+            // Set pinned data with current timestamp
+            node.pinnedData = {
+              enabled: true,
+              data,
+              timestamp: new Date().toISOString(),
+            };
+            
+            // Update manifest timestamp
+            state.manifest!.metadata.updatedAt = new Date().toISOString();
+            
+            // Mark as dirty
+            state.isDirty = true;
+          });
+          
+          // Trigger auto-save
+          get().saveManifest().catch(console.error);
+        },
+        
+        unpinNodeData: (workflowId: string, nodeId: string) => {
+          const state = get();
+          
+          // Cannot unpin if workflow or node doesn't exist
+          if (
+            !state.manifest ||
+            !state.manifest.workflows[workflowId] ||
+            !state.manifest.workflows[workflowId].nodes[nodeId]
+          ) {
+            console.warn(
+              `[WorkflowStore] Cannot unpin data: Workflow or node not found: ${workflowId}/${nodeId}`
+            );
+            return;
+          }
+          
+          set((state) => {
+            const node = state.manifest!.workflows[workflowId].nodes[nodeId];
+            
+            // Remove pinned data
+            node.pinnedData = undefined;
             
             // Update manifest timestamp
             state.manifest!.metadata.updatedAt = new Date().toISOString();

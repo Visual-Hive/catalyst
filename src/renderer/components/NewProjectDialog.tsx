@@ -308,10 +308,10 @@ function NameStep() {
       {/* Template Info */}
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-900">
-          <strong>Template:</strong> React 18 + TypeScript + Vite
+          <strong>Template:</strong> Catalyst Workflow Builder
         </p>
         <p className="mt-1 text-xs text-blue-700">
-          Your project will be set up with modern tooling and best practices.
+          Your project will be set up for visual workflow development and Python code generation.
         </p>
       </div>
     </div>
@@ -526,8 +526,8 @@ function SuccessStep() {
         </p>
         <ul className="space-y-1 text-sm text-blue-800">
           <li>• Project files will appear in the Navigator panel</li>
-          <li>• Start adding components from the Component Library</li>
-          <li>• Run the preview to see your application</li>
+          <li>• Start building workflows by adding nodes to the canvas</li>
+          <li>• Generated Python code will appear in .catalyst/generated/</li>
         </ul>
       </div>
 

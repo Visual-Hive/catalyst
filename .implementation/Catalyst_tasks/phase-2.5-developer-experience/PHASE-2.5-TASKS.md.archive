@@ -2333,6 +2333,29 @@ Consider implementing as Phase 3 feature if too complex for Phase 2.5.
 
 ---
 
+---
+
+### Task 2.17: Test vs Production Execution Modes (2-3 days)
+**File:** `task-2.17-test-prod-modes.md`
+
+Handle testing workflows locally while supporting production webhook deployments.
+
+**Key Deliverables:**
+- Request Simulator UI for HTTP triggers
+- "Capture & Pin Request" from production logs
+- Execution mode toggle (test/production)
+- Optional production log sync webhook
+- Generated code supports both modes
+
+**Why Critical:** Solves the "can't test webhooks locally without tunneling" problem elegantly by letting you simulate or replay real production requests.
+
+**The Smart Solution:**
+- **Local testing:** Simulate HTTP requests OR pin real production data
+- **Production:** Deploy to server, webhooks work normally
+- **No tunneling needed:** Capture real requests from prod, replay them locally
+
+---
+
 ## Phase 2.5 Deliverables Summary
 
 | Task | Deliverable | Critical? |
@@ -2344,6 +2367,7 @@ Consider implementing as Phase 3 feature if too complex for Phase 2.5.
 | 2.14 | Node-by-Node Execution | ⚠️ NICE - Defer if needed |
 | 2.15 | Copy Execution to Canvas | ⚠️ NICE - Defer if needed |
 | 2.16 | Data Passthrough | ✅ YES - Prevents major pain point |
+| 2.17 | Test vs Production Execution Modes | ✅ YES - Critical for testing and debugging |
 
 ---
 

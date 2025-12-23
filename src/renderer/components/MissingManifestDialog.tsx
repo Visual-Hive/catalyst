@@ -7,6 +7,15 @@
  * @author AI (Cline) + Human Review
  * @confidence 9/10 - Standard dialog pattern
  * 
+ * DUAL-SYSTEM SUPPORT:
+ * - Phase 1 (Current): Workflow manifests in .catalyst/ folder (backend Python)
+ * - Phase 2 (Future): Component manifests in .lowcode/ folder (frontend React)
+ * 
+ * This dialog supports both systems to prepare for full-stack integration.
+ * Currently, Catalyst workflows use .catalyst/manifest.json exclusively.
+ * 
+ * @see .implementation/future-tasks/phase-2-frontend-builder.md
+ * 
  * PROBLEM SOLVED:
  * - User opens project without manifest
  * - Manifest is corrupted/unparseable
@@ -66,7 +75,7 @@ export const MissingManifestDialog: React.FC = () => {
       case 'NOT_FOUND':
         return {
           title: 'Manifest Not Found',
-          description: 'This project does not have a manifest.json file in the .lowcode folder. This file is required to manage workflows in Catalyst.',
+          description: 'This project does not have a manifest.json file in the .catalyst folder. This file is required to manage workflows in Catalyst.',
         };
       
       case 'PARSE_ERROR':
@@ -260,7 +269,7 @@ export const MissingManifestDialog: React.FC = () => {
         {/* Help Text */}
         <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
           <strong>What is a manifest?</strong> The manifest.json file stores all
-          information about your components, their properties, and relationships.
+          information about your workflows, nodes, and their connections.
           It's the source of truth for your Catalyst project.
         </div>
       </div>

@@ -18,12 +18,14 @@
  */
 
 import { expect, vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 
 /**
  * CUSTOM MATCHERS
  * 
- * Extend Vitest's expect API with custom matchers specific to Rise.
- * These matchers make tests more readable and reduce boilerplate.
+ * Extend Vitest's expect API with custom matchers.
+ * - @testing-library/jest-dom provides DOM matchers (toBeInTheDocument, toHaveValue, etc.)
+ * - Custom matchers below are specific to Catalyst/Rise
  */
 
 interface CustomMatchers<R = unknown> {

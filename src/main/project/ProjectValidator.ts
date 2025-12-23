@@ -370,25 +370,35 @@ export class ProjectValidator {
       manifest = manifestContent;
     }
 
-    // Check schema version
-    if (manifest.schemaVersion !== '1.0.0') {
-      errors.push({
-        field: 'manifest.schemaVersion',
-        message: `Unsupported schema version: ${manifest.schemaVersion}`,
-        code: ValidationErrorCode.MANIFEST_INVALID,
-        suggestion: 'This project requires a newer version of Rise',
-      });
-    }
+    // Detect manifest type: Catalyst (workflows) vs Rise (level/components)
+    const isCatalystManifest = manifest.workflows !== undefined;
+    const isRiseManifest = manifest.level !== undefined || manifest.components !== undefined;
+    
+    // Only validate Rise-specific fields for Rise manifests
+    if (isRiseManifest && !isCatalystManifest) {
+      // Check schema version (Rise only)
+      if (manifest.schemaVersion !== '1.0.0') {
+        errors.push({
+          field: 'manifest.schemaVersion',
+          message: `Unsupported schema version: ${manifest.schemaVersion}`,
+          code: ValidationErrorCode.MANIFEST_INVALID,
+          suggestion: 'This project requires a newer version of Rise',
+        });
+      }
 
-    // Check level
-    if (manifest.level !== 1) {
-      errors.push({
-        field: 'manifest.level',
-        message: `Level ${manifest.level} projects are not supported in this version`,
-        code: ValidationErrorCode.MANIFEST_WRONG_LEVEL,
-        suggestion: 'This MVP only supports Level 1 projects',
-      });
+      // Check level (Rise only)
+      if (manifest.level !== 1) {
+        errors.push({
+          field: 'manifest.level',
+          message: `Level ${manifest.level} projects are not supported in this version`,
+          code: ValidationErrorCode.MANIFEST_WRONG_LEVEL,
+          suggestion: 'This MVP only supports Level 1 projects',
+        });
+      }
     }
+    
+    // Catalyst manifests don't have level/schemaVersion validation
+    // They use a different structure (workflows, nodes, edges)
 
     // Check for Level 2+ features in components
     if (manifest.components) {
@@ -485,10 +495,10 @@ export class ProjectValidator {
   }
 
   /**
-   * Validates an existing Rise project
+   * Validates an existing Catalyst project
    * 
    * Alias for validateProjectStructure - validates that a directory
-   * contains a valid Rise project.
+   * contains a valid Catalyst project.
    * 
    * @param projectPath - Absolute path to project directory
    * @returns Promise with validation result
@@ -502,11 +512,9 @@ export class ProjectValidator {
   /**
    * Validates a complete project structure
    * 
-   * Checks that a directory contains a valid Rise project with:
-   * - .lowcode/ directory
-   * - .lowcode/manifest.json (valid Level 1)
-   * - package.json
-   * - src/ directory
+   * Checks that a directory contains a valid Catalyst project with:
+   * - .catalyst/ directory (or legacy .lowcode/ for backward compatibility)
+   * - manifest.json (in .catalyst/ or .lowcode/)
    * 
    * Used when opening existing projects to ensure they're valid.
    * 
@@ -541,72 +549,89 @@ export class ProjectValidator {
       return { isValid: false, errors, warnings };
     }
 
-    // Check for .lowcode directory
+    // Check for .catalyst directory (new) or .lowcode directory (legacy)
+    const catalystDir = path.join(projectPath, '.catalyst');
     const lowcodeDir = path.join(projectPath, '.lowcode');
+    
+    let hasCatalystDir = false;
+    let hasLowcodeDir = false;
+    
+    // Check for .catalyst/
+    try {
+      const stats = await fs.stat(catalystDir);
+      if (stats.isDirectory()) {
+        hasCatalystDir = true;
+      }
+    } catch {
+      // .catalyst/ doesn't exist, that's okay if .lowcode/ exists
+    }
+    
+    // Check for .lowcode/ (backward compatibility)
     try {
       const stats = await fs.stat(lowcodeDir);
-      if (!stats.isDirectory()) {
-        errors.push({
-          field: '.lowcode',
-          message: '.lowcode is not a directory',
-          code: ValidationErrorCode.PROJECT_INVALID_STRUCTURE,
-          suggestion: 'This does not appear to be a Rise project',
-        });
+      if (stats.isDirectory()) {
+        hasLowcodeDir = true;
       }
     } catch {
+      // .lowcode/ doesn't exist, that's okay if .catalyst/ exists
+    }
+    
+    // Must have at least one
+    if (!hasCatalystDir && !hasLowcodeDir) {
       errors.push({
-        field: '.lowcode',
-        message: '.lowcode directory not found',
+        field: '.catalyst',
+        message: 'Neither .catalyst/ nor .lowcode/ directory found',
         code: ValidationErrorCode.PROJECT_INVALID_STRUCTURE,
-        suggestion: 'This does not appear to be a Rise project',
+        suggestion: 'This does not appear to be a Catalyst project',
       });
     }
 
-    // Check for manifest.json
-    const manifestPath = path.join(projectPath, '.lowcode', 'manifest.json');
-    try {
-      const content = await fs.readFile(manifestPath, 'utf-8');
-      
-      // Validate manifest content
-      const manifestResult = this.validateManifest(content);
-      errors.push(...manifestResult.errors);
-      if (manifestResult.warnings) {
-        warnings.push(...manifestResult.warnings);
+    // Check for manifest.json in .catalyst/ first, then .lowcode/
+    let manifestPath: string;
+    let manifestFound = false;
+    
+    if (hasCatalystDir) {
+      manifestPath = path.join(projectPath, '.catalyst', 'manifest.json');
+      try {
+        const content = await fs.readFile(manifestPath, 'utf-8');
+        manifestFound = true;
+        
+        // Validate manifest content
+        const manifestResult = this.validateManifest(content);
+        errors.push(...manifestResult.errors);
+        if (manifestResult.warnings) {
+          warnings.push(...manifestResult.warnings);
+        }
+      } catch {
+        // Try .lowcode/ location
       }
-    } catch {
+    }
+    
+    // If not found in .catalyst/, try .lowcode/
+    if (!manifestFound && hasLowcodeDir) {
+      manifestPath = path.join(projectPath, '.lowcode', 'manifest.json');
+      try {
+        const content = await fs.readFile(manifestPath, 'utf-8');
+        manifestFound = true;
+        
+        // Validate manifest content
+        const manifestResult = this.validateManifest(content);
+        errors.push(...manifestResult.errors);
+        if (manifestResult.warnings) {
+          warnings.push(...manifestResult.warnings);
+        }
+      } catch {
+        // Manifest not found in either location
+      }
+    }
+    
+    // If still not found, error
+    if (!manifestFound) {
       errors.push({
         field: 'manifest.json',
-        message: 'manifest.json not found in .lowcode directory',
+        message: 'manifest.json not found in .catalyst/ or .lowcode/ directory',
         code: ValidationErrorCode.MANIFEST_NOT_FOUND,
-        suggestion: 'This project may be corrupted',
-      });
-    }
-
-    // Check for package.json (warning only - not critical)
-    const packageJsonPath = path.join(projectPath, 'package.json');
-    try {
-      await fs.stat(packageJsonPath);
-    } catch {
-      warnings.push({
-        field: 'package.json',
-        message: 'package.json not found - dependencies may not be installed',
-      });
-    }
-
-    // Check for src directory (warning only)
-    const srcDir = path.join(projectPath, 'src');
-    try {
-      const stats = await fs.stat(srcDir);
-      if (!stats.isDirectory()) {
-        warnings.push({
-          field: 'src',
-          message: 'src is not a directory',
-        });
-      }
-    } catch {
-      warnings.push({
-        field: 'src',
-        message: 'src directory not found',
+        suggestion: 'This project may be corrupted or incompatible',
       });
     }
 
