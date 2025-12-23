@@ -40,6 +40,7 @@ import React, { useState, useMemo } from 'react';
 import { X, AlertCircle, Play, CheckCircle } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { useWorkflowStore } from '../../store/workflowStore';
+import { useProjectStore } from '../../store/projectStore';
 
 // ============================================================
 // TYPES
@@ -256,6 +257,9 @@ export function RequestSimulator({
   // Get manifest from Catalyst workflow store (NOT the legacy Rise manifestStore!)
   const manifest = useWorkflowStore((state) => state.manifest);
   
+  // Get current project for database isolation
+  const currentProject = useProjectStore((state) => state.currentProject);
+  
   // --------------------------------------------------------
   // THEME DETECTION
   // --------------------------------------------------------
@@ -385,19 +389,27 @@ export function RequestSimulator({
         body,
       };
       
+      // Validate we have current project for database isolation
+      if (!currentProject?.path) {
+        throw new Error('No project loaded. Please open or create a project first.');
+      }
+      
       // Execute workflow locally via Electron IPC
       // This spawns a Python subprocess with the generated workflow code
       // The trigger data (simulatedRequest) is passed as stdin
       const result = await window.electronAPI.workflow.execute(
         workflowId,
         simulatedRequest, // Trigger data
-        manifest // Full manifest for code generation
+        manifest, // Full manifest for code generation
+        currentProject.path // Project path for database isolation (Task 2.18 fix)
       );
       
       // Handle execution result
-      if (result.success && result.executionId) {
+      // The IPC returns { success: boolean, data: WorkflowExecution, error?: {...} }
+      if (result.success && result.data) {
         // Show success message with execution ID
-        setSuccess(`✅ Workflow execution started! ID: ${result.executionId}`);
+        const executionId = result.data.id;
+        setSuccess(`✅ Workflow execution started! ID: ${executionId}`);
         setIsSaving(false);
         
         // Auto-close modal after 2 seconds
@@ -409,7 +421,8 @@ export function RequestSimulator({
         onRun(simulatedRequest);
       } else {
         // Execution failed - show error
-        throw new Error(result.error || 'Workflow execution failed');
+        const errorMsg = result.error?.message || 'Workflow execution failed';
+        throw new Error(errorMsg);
       }
       
     } catch (err) {

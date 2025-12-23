@@ -67,6 +67,9 @@ import type {
  * ```typescript
  * const logger = ExecutionLogger.getInstance();
  * 
+ * // Set project path before using
+ * logger.setProjectPath('/path/to/project');
+ * 
  * // Log an execution
  * logger.logExecution(executionData);
  * 
@@ -82,42 +85,29 @@ import type {
  * - node_executions: Node-level execution details (FK to executions)
  * - Indexes on workflow_id, status, started_at
  * - CASCADE DELETE for automatic cleanup
+ * 
+ * PROJECT ISOLATION:
+ * - Each project has its own database in .lowcode/executions.db
+ * - Call setProjectPath() to switch between projects
+ * - Database auto-created on first use per project
  */
 export class ExecutionLogger {
-  private db: Database.Database;
+  private db: Database.Database | null = null;
+  private currentProjectPath: string | null = null;
   private static instance: ExecutionLogger;
   private config: ExecutionLoggingConfig;
   
   /**
    * Private constructor (singleton pattern)
    * 
-   * Initializes database connection, creates schema if needed,
-   * and runs initial cleanup based on retention policy.
+   * Note: Database is NOT initialized in constructor.
+   * Call setProjectPath() first to set up project-specific database.
    * 
    * @param config - Execution logging configuration
    */
   private constructor(config: ExecutionLoggingConfig) {
     this.config = config;
-    
-    // Store database in user data directory
-    // This persists across app updates and is user-specific
-    const dbPath = path.join(app.getPath('userData'), 'executions.db');
-    
-    console.log(`[ExecutionLogger] Initializing database at: ${dbPath}`);
-    
-    this.db = new Database(dbPath);
-    
-    // Enable WAL mode for better concurrent access
-    // WAL mode allows readers to access the database while a writer is writing
-    this.db.pragma('journal_mode = WAL');
-    
-    // Initialize database schema
-    this.initializeDatabase();
-    
-    // Run initial cleanup if retention policy is set
-    if (config.retentionDays > 0) {
-      this.cleanupOldExecutions(config.retentionDays);
-    }
+    // Database initialized lazily in setProjectPath()
   }
   
   /**
@@ -129,11 +119,97 @@ export class ExecutionLogger {
   public static getInstance(config?: ExecutionLoggingConfig): ExecutionLogger {
     if (!ExecutionLogger.instance) {
       if (!config) {
-        throw new Error('ExecutionLogger config required for first initialization');
+        // Use default config if not provided
+        config = {
+          enabled: true,
+          logLevel: 'all',
+          retentionDays: 30,
+          maxExecutionsPerWorkflow: 1000,
+        };
       }
       ExecutionLogger.instance = new ExecutionLogger(config);
     }
     return ExecutionLogger.instance;
+  }
+  
+  /**
+   * Set the current project path and initialize/switch database
+   * 
+   * MUST be called before any logging or querying operations.
+   * Safe to call multiple times - only switches DB if path changed.
+   * 
+   * @param projectPath - Absolute path to project directory
+   * 
+   * @example
+   * ```typescript
+   * const logger = ExecutionLogger.getInstance();
+   * logger.setProjectPath('/Users/me/projects/my-workflow');
+   * // Now can use logger.logExecution(), logger.queryExecutions(), etc.
+   * ```
+   */
+  public setProjectPath(projectPath: string): void {
+    // Skip if already connected to this project
+    if (this.currentProjectPath === projectPath && this.db) {
+      return;
+    }
+    
+    console.log('[ExecutionLogger] Switching to project:', projectPath);
+    
+    // Close existing connection
+    if (this.db) {
+      try {
+        this.db.close();
+      } catch (e) {
+        console.warn('[ExecutionLogger] Error closing previous DB:', e);
+      }
+    }
+    
+    // Create .lowcode directory if it doesn't exist
+    const lowcodePath = path.join(projectPath, '.lowcode');
+    if (!require('fs').existsSync(lowcodePath)) {
+      require('fs').mkdirSync(lowcodePath, { recursive: true });
+    }
+    
+    // Open project-specific database
+    const dbPath = path.join(lowcodePath, 'executions.db');
+    console.log('[ExecutionLogger] Opening database:', dbPath);
+    
+    this.db = new Database(dbPath);
+    this.db.pragma('journal_mode = WAL');
+    this.currentProjectPath = projectPath;
+    
+    this.initializeDatabase();
+    
+    // Run initial cleanup if retention policy is set
+    if (this.config.retentionDays > 0) {
+      this.cleanupOldExecutions(this.config.retentionDays);
+    }
+  }
+  
+  /**
+   * Get current project path (for debugging)
+   */
+  public getCurrentProjectPath(): string | null {
+    return this.currentProjectPath;
+  }
+  
+  /**
+   * Check if logger is ready (has active project)
+   */
+  public isReady(): boolean {
+    return this.db !== null && this.currentProjectPath !== null;
+  }
+  
+  /**
+   * Ensure logger is ready before operations
+   * Throws error if setProjectPath() not called
+   */
+  private ensureReady(): void {
+    if (!this.db || !this.currentProjectPath) {
+      throw new Error(
+        '[ExecutionLogger] Database not initialized. Call setProjectPath() first.'
+      );
+    }
   }
   
   /**
@@ -164,7 +240,9 @@ export class ExecutionLogger {
    * - Indexes for fast queries on common patterns
    */
   private initializeDatabase(): void {
-    this.db.exec(`
+    this.ensureReady();
+    
+    this.db!.exec(`
       -- Main executions table
       CREATE TABLE IF NOT EXISTS executions (
         id TEXT PRIMARY KEY,
@@ -229,6 +307,7 @@ export class ExecutionLogger {
    * 
    * @example
    * ```typescript
+   * logger.setProjectPath('/path/to/project');
    * logger.logExecution({
    *   id: 'exec_123',
    *   workflowId: 'wf_search',
@@ -243,6 +322,8 @@ export class ExecutionLogger {
    * ```
    */
   public logExecution(execution: WorkflowExecution): boolean {
+    this.ensureReady();
+    
     // Check if logging is enabled
     if (!this.config.enabled) {
       return false;
@@ -255,9 +336,9 @@ export class ExecutionLogger {
     }
     
     // Use transaction for atomic insert
-    const insertExecution = this.db.transaction(() => {
+    const insertExecution = this.db!.transaction(() => {
       // Insert main execution record
-      const stmt = this.db.prepare(`
+      const stmt = this.db!.prepare(`
         INSERT INTO executions (
           id, workflow_id, workflow_name, execution_mode, status, started_at, 
           completed_at, duration_ms, trigger_type, trigger_data, is_simulated,
@@ -354,7 +435,9 @@ export class ExecutionLogger {
    * @param maxExecutions - Maximum executions to keep
    */
   private enforceWorkflowLimit(workflowId: string, maxExecutions: number): void {
-    const stmt = this.db.prepare(`
+    this.ensureReady();
+    
+    const stmt = this.db!.prepare(`
       DELETE FROM executions
       WHERE id IN (
         SELECT id FROM executions
@@ -379,6 +462,9 @@ export class ExecutionLogger {
    * 
    * @example
    * ```typescript
+   * // Set project first
+   * logger.setProjectPath('/path/to/project');
+   * 
    * // Get last 50 executions for a workflow
    * const executions = logger.queryExecutions({
    *   workflowId: 'wf_search',
@@ -395,6 +481,7 @@ export class ExecutionLogger {
    * ```
    */
   public queryExecutions(options: ExecutionQueryOptions = {}): WorkflowExecution[] {
+    this.ensureReady();
     const {
       workflowId,
       status,
@@ -421,7 +508,7 @@ export class ExecutionLogger {
     query += ' LIMIT ? OFFSET ?';
     params.push(limit, offset);
     
-    const stmt = this.db.prepare(query);
+    const stmt = this.db!.prepare(query);
     const rows = stmt.all(...params) as any[];
     
     // Convert rows to WorkflowExecution objects
@@ -452,7 +539,9 @@ export class ExecutionLogger {
    * @returns Execution or null if not found
    */
   public getExecution(executionId: string): WorkflowExecution | null {
-    const stmt = this.db.prepare('SELECT * FROM executions WHERE id = ?');
+    this.ensureReady();
+    
+    const stmt = this.db!.prepare('SELECT * FROM executions WHERE id = ?');
     const row = stmt.get(executionId) as any;
     
     if (!row) {
@@ -469,7 +558,9 @@ export class ExecutionLogger {
    * @returns Execution statistics
    */
   public getStats(workflowId: string): ExecutionStats {
-    const stmt = this.db.prepare(`
+    this.ensureReady();
+    
+    const stmt = this.db!.prepare(`
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success,
@@ -501,7 +592,9 @@ export class ExecutionLogger {
    * @returns true if deleted, false if not found
    */
   public deleteExecution(executionId: string): boolean {
-    const stmt = this.db.prepare('DELETE FROM executions WHERE id = ?');
+    this.ensureReady();
+    
+    const stmt = this.db!.prepare('DELETE FROM executions WHERE id = ?');
     const result = stmt.run(executionId);
     
     return result.changes > 0;
@@ -514,7 +607,9 @@ export class ExecutionLogger {
    * @returns Number of executions deleted
    */
   public clearWorkflowExecutions(workflowId: string): number {
-    const stmt = this.db.prepare('DELETE FROM executions WHERE workflow_id = ?');
+    this.ensureReady();
+    
+    const stmt = this.db!.prepare('DELETE FROM executions WHERE workflow_id = ?');
     const result = stmt.run(workflowId);
     
     console.log(`[ExecutionLogger] Cleared ${result.changes} executions for workflow ${workflowId}`);
@@ -528,6 +623,8 @@ export class ExecutionLogger {
    * @returns Number of executions deleted
    */
   public cleanupOldExecutions(retentionDays: number): number {
+    this.ensureReady();
+    
     if (retentionDays === 0) {
       return 0; // Keep forever
     }
@@ -537,7 +634,7 @@ export class ExecutionLogger {
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
     const cutoffISO = cutoffDate.toISOString();
     
-    const stmt = this.db.prepare('DELETE FROM executions WHERE started_at < ?');
+    const stmt = this.db!.prepare('DELETE FROM executions WHERE started_at < ?');
     const result = stmt.run(cutoffISO);
     
     if (result.changes > 0) {
@@ -555,8 +652,10 @@ export class ExecutionLogger {
    * @returns WorkflowExecution object
    */
   private rowToExecution(row: any): WorkflowExecution {
+    this.ensureReady();
+    
     // Fetch node executions for this execution
-    const nodeStmt = this.db.prepare(`
+    const nodeStmt = this.db!.prepare(`
       SELECT * FROM node_executions 
       WHERE execution_id = ?
       ORDER BY id ASC
@@ -611,7 +710,11 @@ export class ExecutionLogger {
    * Should be called on app shutdown
    */
   public close(): void {
-    console.log('[ExecutionLogger] Closing database connection');
-    this.db.close();
+    if (this.db) {
+      console.log('[ExecutionLogger] Closing database connection');
+      this.db.close();
+      this.db = null;
+      this.currentProjectPath = null;
+    }
   }
 }

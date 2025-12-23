@@ -164,8 +164,9 @@ export class WorkflowExecutor {
     
     try {
       // Step 1: Ensure Python environment with auto-install
-      // This will automatically install missing packages from requirements.txt
+      // Clear cache to ensure fresh validation (handles multi-version Python environments)
       const pythonEnv = PythonEnvironment.getInstance();
+      pythonEnv.clearCache();
       await pythonEnv.ensureDependencies(true);
       
       // Step 2: Generate Python code

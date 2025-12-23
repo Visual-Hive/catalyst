@@ -33,12 +33,13 @@
  * @security-critical false
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ArrowPathIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import type { WorkflowExecution } from '../../../core/execution/types';
 import { useAutoRefresh, useAutoRefreshState } from './hooks/useAutoRefresh';
 import { ExecutionDetails } from './ExecutionDetails';
 import { ExecutionListItem } from './ExecutionListItem';
+import { useProjectStore } from '../../store/projectStore';
 
 /**
  * Props for ExecutionHistoryPanel
@@ -94,6 +95,9 @@ interface FilterState {
  * ```
  */
 export function ExecutionHistoryPanel({ currentWorkflowId }: ExecutionHistoryPanelProps) {
+  // Get current project path for database isolation
+  const currentProject = useProjectStore((state) => state.currentProject);
+  
   // Executions data
   const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
   const [selectedExecution, setSelectedExecution] = useState<WorkflowExecution | null>(null);
@@ -101,6 +105,9 @@ export function ExecutionHistoryPanel({ currentWorkflowId }: ExecutionHistoryPan
   // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use ref instead of state to avoid dependency cycle
+  const isQueryingRef = useRef(false);
   
   // Filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -123,10 +130,27 @@ export function ExecutionHistoryPanel({ currentWorkflowId }: ExecutionHistoryPan
    * 4. Handle errors gracefully
    * 
    * TIMING: Called on mount, filter change, and auto-refresh
+   * 
+   * FIX: Removed selectedExecution from dependencies to prevent infinite loop.
+   * Now uses functional state update to access current selectedExecution without dependency.
    */
   const loadExecutions = useCallback(async () => {
+    // Prevent concurrent queries (infinite loop protection)
+    if (isQueryingRef.current) {
+      console.log('[ExecutionHistoryPanel] Query already in progress, skipping');
+      return;
+    }
+    
     try {
+      isQueryingRef.current = true;
       setError(null);
+      
+      // Get project path for database isolation
+      if (!currentProject?.path) {
+        console.warn('[ExecutionHistoryPanel] No project loaded, cannot query executions');
+        setExecutions([]);
+        return;
+      }
       
       // Build query options from filters
       const queryOptions = {
@@ -134,27 +158,33 @@ export function ExecutionHistoryPanel({ currentWorkflowId }: ExecutionHistoryPan
         status: filters.status,
         limit: 100, // Load last 100 executions
         sortOrder: 'desc' as const, // Newest first
+        projectPath: currentProject.path, // Include project path for database isolation
       };
+      
+      console.log('[ExecutionHistoryPanel] Querying executions:', queryOptions);
       
       // Call backend via IPC
       const result = await window.electronAPI.execution.query(queryOptions);
       
+      console.log(`[ExecutionHistoryPanel] Received ${result?.length || 0} executions`);
+      
       // Update executions list
       setExecutions(result);
       
-      // If selected execution is no longer in list, clear selection
-      if (selectedExecution) {
-        const stillExists = result.some(ex => ex.id === selectedExecution.id);
+      // Update selected execution if it exists in new results
+      // Use functional update to avoid selectedExecution dependency
+      setSelectedExecution(prevSelected => {
+        if (!prevSelected) return null;
+        
+        const stillExists = result.some(ex => ex.id === prevSelected.id);
         if (!stillExists) {
-          setSelectedExecution(null);
-        } else {
-          // Update selected execution with fresh data
-          const updated = result.find(ex => ex.id === selectedExecution.id);
-          if (updated) {
-            setSelectedExecution(updated);
-          }
+          return null;
         }
-      }
+        
+        // Update with fresh data
+        const updated = result.find(ex => ex.id === prevSelected.id);
+        return updated || prevSelected;
+      });
       
     } catch (err) {
       // Handle query errors
@@ -163,8 +193,9 @@ export function ExecutionHistoryPanel({ currentWorkflowId }: ExecutionHistoryPan
       setError(message);
     } finally {
       setIsLoading(false);
+      isQueryingRef.current = false;
     }
-  }, [filters, selectedExecution]);
+  }, [filters, currentProject?.path]); // CRITICAL FIX: Removed isQuerying from dependencies to prevent infinite loop
   
   /**
    * Handle manual refresh button click

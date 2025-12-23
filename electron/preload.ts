@@ -269,7 +269,7 @@ export interface WorkflowAPI {
   getCodePreview: (request: PreviewCodeRequest) => Promise<PreviewCodeResult>;
   
   /** Execute workflow locally (Phase 2.5, Task 2.18) */
-  execute: (workflowId: string, triggerData: any, manifest: any) => Promise<{ success: boolean; executionId?: string; error?: string }>;
+  execute: (workflowId: string, triggerData: any, manifest: any, projectPath: string) => Promise<{ success: boolean; executionId?: string; error?: string }>;
   
   /** Stop running execution */
   stop: (executionId: string) => Promise<{ success: boolean; error?: string }>;
@@ -777,8 +777,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke('workflow:get-code-preview', request),
     
     // Execute workflow locally (Phase 2.5, Task 2.18)
-    execute: (workflowId: string, triggerData: any, manifest: any) =>
-      ipcRenderer.invoke('workflow:execute', workflowId, triggerData, manifest),
+    execute: (workflowId: string, triggerData: any, manifest: any, projectPath: string) =>
+      ipcRenderer.invoke('workflow:execute', workflowId, triggerData, manifest, projectPath),
     
     // Stop running execution
     stop: (executionId: string) =>

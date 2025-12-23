@@ -61,13 +61,20 @@ export function registerExecutionHandlers(logger: ExecutionLogger): void {
    * 
    * IPC: execution:query
    * 
-   * @param options - Query options (workflowId, status, limit, offset, sortOrder)
+   * @param options - Query options (workflowId, status, limit, offset, sortOrder, projectPath)
    * @returns Array of workflow executions
    */
-  ipcMain.handle('execution:query', async (event, options: ExecutionQueryOptions) => {
+  ipcMain.handle('execution:query', async (event, options: ExecutionQueryOptions & { projectPath?: string }) => {
     try {
-      console.log('[ExecutionHandlers] Querying executions:', options);
-      return logger.queryExecutions(options);
+      const { projectPath, ...queryOptions } = options;
+      
+      // Set project path if provided
+      if (projectPath) {
+        logger.setProjectPath(projectPath);
+      }
+      
+      console.log('[ExecutionHandlers] Querying executions:', queryOptions);
+      return logger.queryExecutions(queryOptions);
     } catch (error) {
       console.error('[ExecutionHandlers] Failed to query executions:', error);
       throw error;
@@ -80,10 +87,15 @@ export function registerExecutionHandlers(logger: ExecutionLogger): void {
    * IPC: execution:get
    * 
    * @param executionId - Execution ID
+   * @param projectPath - Optional project path to set
    * @returns Execution or null if not found
    */
-  ipcMain.handle('execution:get', async (event, executionId: string) => {
+  ipcMain.handle('execution:get', async (event, executionId: string, projectPath?: string) => {
     try {
+      if (projectPath) {
+        logger.setProjectPath(projectPath);
+      }
+      
       console.log('[ExecutionHandlers] Getting execution:', executionId);
       return logger.getExecution(executionId);
     } catch (error) {
@@ -98,10 +110,15 @@ export function registerExecutionHandlers(logger: ExecutionLogger): void {
    * IPC: execution:get-stats
    * 
    * @param workflowId - Workflow ID
+   * @param projectPath - Optional project path to set
    * @returns Execution statistics
    */
-  ipcMain.handle('execution:get-stats', async (event, workflowId: string) => {
+  ipcMain.handle('execution:get-stats', async (event, workflowId: string, projectPath?: string) => {
     try {
+      if (projectPath) {
+        logger.setProjectPath(projectPath);
+      }
+      
       console.log('[ExecutionHandlers] Getting stats for workflow:', workflowId);
       return logger.getStats(workflowId);
     } catch (error) {
@@ -116,10 +133,15 @@ export function registerExecutionHandlers(logger: ExecutionLogger): void {
    * IPC: execution:delete
    * 
    * @param executionId - Execution ID to delete
+   * @param projectPath - Optional project path to set
    * @returns Success flag
    */
-  ipcMain.handle('execution:delete', async (event, executionId: string) => {
+  ipcMain.handle('execution:delete', async (event, executionId: string, projectPath?: string) => {
     try {
+      if (projectPath) {
+        logger.setProjectPath(projectPath);
+      }
+      
       console.log('[ExecutionHandlers] Deleting execution:', executionId);
       const deleted = logger.deleteExecution(executionId);
       return { success: deleted };
@@ -135,10 +157,15 @@ export function registerExecutionHandlers(logger: ExecutionLogger): void {
    * IPC: execution:clear-workflow
    * 
    * @param workflowId - Workflow ID
+   * @param projectPath - Optional project path to set
    * @returns Number of executions deleted
    */
-  ipcMain.handle('execution:clear-workflow', async (event, workflowId: string) => {
+  ipcMain.handle('execution:clear-workflow', async (event, workflowId: string, projectPath?: string) => {
     try {
+      if (projectPath) {
+        logger.setProjectPath(projectPath);
+      }
+      
       console.log('[ExecutionHandlers] Clearing executions for workflow:', workflowId);
       const count = logger.clearWorkflowExecutions(workflowId);
       return { success: true, count };
@@ -182,13 +209,18 @@ export function registerExecutionHandlers(logger: ExecutionLogger): void {
    * - Returns structured data ready for pinNodeData() calls
    * 
    * @param executionId - Execution ID to copy from
+   * @param projectPath - Optional project path to set
    * @returns Workflow ID and array of node pins
    * 
    * @see .implementation/Catalyst_tasks/phase-2.5-developer-experience/task-2.15-copy-execution.md
    * @see src/renderer/store/workflowStore.ts - pinNodeData method
    */
-  ipcMain.handle('execution:copy-to-canvas', async (event, executionId: string) => {
+  ipcMain.handle('execution:copy-to-canvas', async (event, executionId: string, projectPath?: string) => {
     try {
+      if (projectPath) {
+        logger.setProjectPath(projectPath);
+      }
+      
       console.log('[ExecutionHandlers] Copying execution to canvas:', executionId);
       
       // Get execution from logger

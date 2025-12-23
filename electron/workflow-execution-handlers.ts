@@ -36,6 +36,7 @@
 import { ipcMain } from 'electron';
 import { WorkflowExecutor } from './workflow-executor';
 import { PythonEnvironment, type ValidationStatus } from './python-environment';
+import { ExecutionLogger } from './execution-logger';
 import type { WorkflowExecution } from '../src/core/execution/types';
 import type { WorkflowDefinition, CatalystManifest } from '../src/core/workflow/types';
 import type { SimulatedRequest } from '../src/renderer/components/WorkflowCanvas/RequestSimulator';
@@ -68,19 +69,24 @@ export function registerWorkflowExecutionHandlers(): void {
    * @param workflowId - Workflow ID to execute
    * @param triggerData - Simulated HTTP request data
    * @param manifest - Complete Catalyst manifest
+   * @param projectPath - Project directory path (for database isolation)
    * @returns Promise<IPCResponse<WorkflowExecution>>
    */
   ipcMain.handle(
     'workflow:execute',
-    async (_event, workflowId: string, triggerData: SimulatedRequest, manifest: CatalystManifest) => {
+    async (_event, workflowId: string, triggerData: SimulatedRequest, manifest: CatalystManifest, projectPath: string) => {
       try {
-        console.log(`[IPC] workflow:execute called for workflow ${workflowId}`);
+        console.log(`[IPC] workflow:execute called for workflow ${workflowId} in project ${projectPath}`);
         
         // Load workflow from manifest
         const workflow = manifest.workflows[workflowId];
         if (!workflow) {
           throw new Error(`Workflow ${workflowId} not found in manifest`);
         }
+        
+        // Set project path on execution logger for database isolation
+        const executionLogger = ExecutionLogger.getInstance();
+        executionLogger.setProjectPath(projectPath);
         
         // Extract API keys from node configurations
         const environment = extractEnvironmentVariables(workflow);

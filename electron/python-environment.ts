@@ -217,6 +217,9 @@ export class PythonEnvironment {
   /**
    * Install missing packages via pip
    * 
+   * CRITICAL: Uses `python -m pip` instead of calling `pip` directly because
+   * `python3` and `pip3` can point to different Python installations!
+   * 
    * @param packages - Package names to install
    * @returns Installation result
    */
@@ -224,12 +227,14 @@ export class PythonEnvironment {
     console.log(`[PythonEnvironment] Installing packages: ${packages.join(', ')}`);
     
     const pythonPath = await this.getPythonPath();
-    const pipPath = pythonPath.replace(/python3?$/, 'pip3');
     
     try {
       const packageList = packages.join(' ');
+      // Use python -m pip to ensure packages install to the SAME Python
+      // that will be used for execution (python3 and pip3 can be different!)
+      // --break-system-packages is required for Homebrew Python (PEP 668)
       const { stdout, stderr } = await execAsync(
-        `"${pipPath}" install ${packageList}`
+        `"${pythonPath}" -m pip install ${packageList} --break-system-packages`
       );
       
       console.log('[PythonEnvironment] Installation successful');
@@ -423,21 +428,21 @@ export class PythonEnvironment {
   /**
    * Install all packages from requirements.txt
    * 
-   * Uses pip to install from the requirements file directly.
-   * This is more reliable than installing packages individually.
+   * Uses `python -m pip` to install from the requirements file directly.
+   * CRITICAL: Uses `python -m pip` instead of calling `pip` directly because
+   * `python3` and `pip3` can point to different Python installations!
    * 
    * @param pythonPath - Path to Python executable
    */
   private async installFromRequirements(pythonPath: string): Promise<void> {
     console.log(`[PythonEnvironment] Installing packages from ${this.REQUIREMENTS_FILE}`);
     
-    // Derive pip path from python path
-    const pipPath = pythonPath.replace(/python3?$/, 'pip3');
-    
     try {
-      // Install with --user flag to avoid permission issues
+      // Use python -m pip to ensure packages install to the SAME Python
+      // that will be used for execution (python3 and pip3 can be different!)
+      // --break-system-packages is required for Homebrew Python (PEP 668)
       const { stdout, stderr } = await execAsync(
-        `"${pipPath}" install -r "${this.REQUIREMENTS_FILE}" --user`
+        `"${pythonPath}" -m pip install -r "${this.REQUIREMENTS_FILE}" --break-system-packages`
       );
       
       console.log('[PythonEnvironment] Installation output:');
@@ -481,6 +486,11 @@ export class PythonEnvironment {
   /**
    * Check if a specific package is installed
    * 
+   * Uses `python -m pip show` to check if package exists in this Python environment.
+   * CRITICAL: Uses `python -m pip` instead of calling `pip` directly because
+   * `python3` and `pip3` can point to different Python installations!
+   * This ensures we check packages in the SAME Python that will run the workflow.
+   * 
    * @param pythonPath - Path to Python executable
    * @param packageName - Package name to check
    * @returns true if installed
@@ -490,12 +500,12 @@ export class PythonEnvironment {
     packageName: string
   ): Promise<boolean> {
     try {
-      // Try to import the package
-      await execAsync(
-        `"${pythonPath}" -c "import ${packageName}"`
-      );
+      // Use python -m pip to ensure we check the SAME Python's packages
+      // that will be used for execution (python3 and pip3 can be different!)
+      await execAsync(`"${pythonPath}" -m pip show ${packageName}`, { timeout: 5000 });
       return true;
     } catch (error) {
+      // Package not found
       return false;
     }
   }
